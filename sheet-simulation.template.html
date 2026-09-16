@@ -1,0 +1,182 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Piezo sheet: cell size × cell count</title><style>
+:root {color-scheme:light dark;--background:light-dark(#fff,#16191b);--foreground:light-dark(#202a30,#e1e9ee);--border:light-dark(#bdc7cd,#52616a);--muted-foreground:light-dark(#53636f,#a7b8c3);--popover:var(--background);--popover-foreground:var(--foreground);--destructive:light-dark(#a62920,#ff9e96);--viz-series-1:light-dark(#006b9f,#6bc8f5);--viz-series-2:light-dark(#99400a,#fdb87d);--viz-series-3:light-dark(#2e7d4f,#7fd6a0);}
+body {max-width:960px;margin:24px auto;padding:0 20px;background:var(--background);color:var(--foreground);font:16px/1.5 system-ui,sans-serif}
+h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .text-small {font-size:0.875rem} .btn {font:inherit;padding:6px 14px;border:1px solid var(--border);border-radius:5px;background:var(--background);color:var(--foreground)} a {color:var(--viz-series-1)} footer {margin:24px 0;color:var(--muted-foreground)}
+</style></head><body><div id="piezo-sheet">
+  <style>
+    #piezo-sheet {color:var(--foreground);font-family:system-ui,sans-serif;position:relative}
+    #piezo-sheet * {box-sizing:border-box}
+    #piezo-sheet .controls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;margin:16px 0}
+    #piezo-sheet label {display:block;min-width:0}
+    #piezo-sheet input[type=range] {width:100%;accent-color:var(--viz-series-1)}
+    #piezo-sheet input[type=number],#piezo-sheet select {width:100%;min-height:38px;color:var(--foreground);background:var(--background);border:1px solid var(--border);padding:6px;font:inherit}
+    #piezo-sheet output {font-variant-numeric:tabular-nums}
+    #piezo-sheet .row {display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    #piezo-sheet .metrics {display:flex;gap:14px 30px;flex-wrap:wrap;margin:12px 0}
+    #piezo-sheet .metrics span {display:block}
+    #piezo-sheet button {cursor:pointer;min-height:36px}
+    #piezo-sheet .scene {display:block;width:100%;height:260px}
+    #piezo-sheet svg text {fill:var(--foreground);font-size:12px;font-weight:400}
+    #piezo-sheet .charts {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    #piezo-sheet .chart {width:100%;height:180px;display:block}
+    #piezo-sheet .wide {grid-column:1/-1;height:220px}
+    #piezo-sheet .tip {position:absolute;pointer-events:none;padding:8px;background:var(--popover);color:var(--popover-foreground);border:1px solid var(--border);z-index:2}
+    #piezo-sheet .error {color:var(--destructive)}
+    #piezo-sheet .phase {flex:1;min-width:150px}
+    #piezo-sheet summary {cursor:pointer;padding:8px 0}
+    #piezo-sheet .readout {min-height:2.5em;font-variant-numeric:tabular-nums}
+    @media(max-width:480px) {#piezo-sheet .charts {grid-template-columns:1fr} #piezo-sheet .controls {gap:12px}}
+  </style>
+  <h2>Piezo sheet: customizable cell size and number of cells</h2>
+  <div class="text-small">Strip model per cell · N identical cells · shared source (one pump split across cells) or independent jets (upper bound)</div>
+  <div class="controls" id="primary-controls"></div>
+  <details>
+    <summary>Laminate, load, damping &amp; charging assumptions</summary>
+    <div class="text-small">Each cell is a clamped PZT-5A/steel strip struck at its tip by a pulsed jet (MODEL.md). Cells feed separate loads; totals are sums of per-cell AC power. Shared mode divides the source area evenly: per-cell jet diameter = source ÷ √N.</div>
+    <div class="controls" id="advanced-controls"></div>
+  </details>
+  <div id="validation" role="alert" class="error"></div>
+  <svg class="scene" role="img" aria-label="A grid of piezo cells; each tile brightens as its strip bends during the pulse cycle."></svg>
+  <div class="row">
+    <button id="play" type="button" class="btn">Play cycle</button>
+    <label class="phase">Cycle position <output id="phase-value">0 s</output><input id="phase" type="range" min="0" max="1000" value="0" aria-label="Cycle position"></label>
+  </div>
+  <div class="readout text-small" id="instant"></div>
+  <div class="metrics" aria-live="polite" id="metrics"></div>
+  <div class="charts">
+    <svg class="chart wide" id="sweep-plot" role="img" aria-label="Total sheet power versus number of cells for shared and independent sources"></svg>
+    <svg class="chart" id="bend-plot" role="img" aria-label="Per-cell tip displacement over one pulse cycle"></svg>
+    <svg class="chart" id="voltage-plot" role="img" aria-label="Per-cell load voltage over one pulse cycle"></svg>
+  </div>
+  <div class="text-small" id="limits" aria-live="polite"></div>
+  <div class="text-small" id="charging" aria-live="polite"></div>
+  <div class="tip" role="tooltip" hidden></div>
+</div>
+<footer class="text-small">Sources: <code>model.mjs</code>, <code>sheet.mjs</code> (checked by <code>node check.mjs</code>, <code>node check-sheet.mjs</code>). Rebuild with <code>node build.mjs</code>.</footer>
+
+<script>
+// https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock
+/*__D3__*/
+</script>
+<script>
+/*__MODEL__*/
+
+(() => {
+  const root=document.getElementById('piezo-sheet'),$=s=>root.querySelector(s);
+  const primary=[['cells','Number of cells','',1],['length','Cell length','mm',5],['width','Cell width','mm',1],
+    ['speed','Peak water speed','m/s',0.05],['period','Pulse period','s',0.25],['diameter','Source jet diameter','mm',1]];
+  const advanced=[['substrate','Steel thickness','mm',0.05],['piezo','Piezo thickness','mm',0.05],['resistance','Electrical load per cell','MΩ',0.01],
+    ['addedMass','Effective added mass per cell','g',1],['damping','Damping ratio','',0.01],['strainLimit','Strain screening limit','µε',50],
+    ['battery','Energy per AUV charge','Wh',1],['efficiency','Assumed AC-to-battery fraction','',0.05]];
+  const settings={...sheetDefaults};
+  let model=simulateSheet(settings),sweep=sheetSweep(settings),phase=0,playing=false,last=0,frame,plotScales=[];
+  const fmt=(v,d=2)=>Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
+  const watts=v=>v<0.001?fmt(v*1e6)+' µW':v<1?fmt(v*1000)+' mW':fmt(v)+' W';
+  function controls(items,target,type) {
+    for(const [key,label,unit,step] of items) {
+      const box=document.createElement('label'),out=document.createElement('output'),input=document.createElement('input');
+      box.append(label+' ',out);out.textContent=fmt(settings[key])+' '+unit;
+      const [lo,hi]=sheetBounds[key];
+      Object.assign(input,{type,min:lo,max:key==='cells'?500:hi,step,value:settings[key],id:'p-'+key});
+      input.addEventListener('input',()=>{settings[key]=input.value===''?NaN:Number(input.value);out.textContent=input.value+' '+unit;update();});
+      box.append(input);$(target).append(box);
+    }
+  }
+  controls(primary,'#primary-controls','range');
+  const modeBox=document.createElement('label'),select=document.createElement('select');
+  modeBox.textContent='Source sharing ';
+  for(const [v,t] of [['shared','Shared: one source split across all cells'],['independent','Independent: every cell gets its own jet']]){const o=document.createElement('option');o.value=v;o.textContent=t;select.append(o);}
+  select.value=settings.sharing;select.addEventListener('change',()=>{settings.sharing=select.value;update();});
+  modeBox.append(select);$('#primary-controls').append(modeBox);
+  controls(advanced,'#advanced-controls','number');
+  function scene() {
+    const svg=d3.select($('.scene')),w=$('.scene').clientWidth,n=model.cells,ratio=model.p.length/model.p.width;
+    svg.attr('viewBox',`0 0 ${w} 260`).selectAll('*').remove();
+    const cols=Math.max(1,Math.round(Math.sqrt(n*ratio))),rows=Math.ceil(n/cols);
+    const cw=Math.min((w-40)/cols,(200/rows)*ratio,220),ch=cw/ratio,x0=(w-cols*cw)/2,y0=30+(200-rows*ch)/2;
+    const g=svg.append('g').attr('class','cells');
+    g.selectAll('rect').data(d3.range(n)).join('rect')
+      .attr('x',i=>x0+(i%cols)*cw+1).attr('y',i=>y0+Math.floor(i/cols)*ch+1)
+      .attr('width',Math.max(1,cw-2)).attr('height',Math.max(1,ch-2)).attr('rx',Math.min(3,cw/6))
+      .attr('fill','var(--viz-series-2)').attr('stroke','var(--border)').attr('stroke-width',cw>8?1:0);
+    svg.append('text').attr('x',12).attr('y',18).text(`${n} cells · ${fmt(model.p.length,0)}×${fmt(model.p.width,0)} mm each · sheet ${fmt(model.area*1e4,0)} cm² · per-cell jet ${fmt(model.cellDiameter,1)} mm (${model.sharing})`);
+    svg.append('text').attr('x',12).attr('y',252).text('Tile brightness follows each cell’s bend during the pulse cycle (all cells move together in this model).');
+  }
+  function chart(selector,key,mult,label,color) {
+    const node=$(selector),w=node.clientWidth,h=180,svg=d3.select(node),pts=model.cell.points,T=model.p.period;
+    svg.attr('viewBox',`0 0 ${w} ${h}`).selectAll('*').remove();
+    const vals=pts.map(p=>p[key]*mult),ext=d3.extent([...vals,0]),pad=(ext[1]-ext[0]||1)*0.12;
+    const x=d3.scaleLinear().domain([0,T]).range([67,w-18]),y=d3.scaleLinear().domain([ext[0]-pad,ext[1]+pad]).range([139,29]);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',110).attr('fill','none').attr('stroke','var(--border)');
+    svg.append('g').attr('transform','translate(0,139)').call(d3.axisBottom(x).ticks(w<360?3:4));
+    svg.append('g').attr('transform','translate(67,0)').call(d3.axisLeft(y).ticks(3).tickFormat(d3.format('.2~g')));
+    svg.append('text').attr('x',0).attr('y',15).text(label);
+    svg.append('text').attr('x',w-18).attr('y',176).attr('text-anchor','end').text('Time (s)');
+    svg.append('path').datum(pts).attr('fill','none').attr('stroke',color).attr('stroke-width',2).attr('d',d3.line().x(d=>x(d.t)).y(d=>y(d[key]*mult)));
+    svg.append('line').attr('class','cursor').attr('y1',29).attr('y2',139).attr('stroke','var(--foreground)').attr('stroke-dasharray','3 3');
+    svg.append('circle').attr('class','marker').attr('r',3).attr('fill',color);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',110).attr('fill','transparent')
+      .on('pointermove',event=>inspect(event,node,x)).on('pointerleave',()=>{$('.tip').hidden=true;});
+    plotScales.push({svg,x,y,key,mult});
+  }
+  function sweepChart() {
+    const node=$('#sweep-plot'),w=node.clientWidth,h=220,svg=d3.select(node);
+    svg.attr('viewBox',`0 0 ${w} ${h}`).selectAll('*').remove();
+    const rows=sweep.filter(r=>r.shared>0||r.independent>0);
+    const vals=rows.flatMap(r=>[r.shared,r.independent]).filter(v=>v>0);
+    if(!vals.length)return;
+    const x=d3.scaleLinear().domain([1,Math.max(2,settings.cells)]).range([67,w-18]);
+    const y=d3.scaleLog().domain([d3.min(vals)*0.7,d3.max(vals)*1.4]).range([179,29]);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',150).attr('fill','none').attr('stroke','var(--border)');
+    svg.append('g').attr('transform','translate(0,179)').call(d3.axisBottom(x).ticks(6).tickFormat(d3.format('d')));
+    svg.append('g').attr('transform','translate(67,0)').call(d3.axisLeft(y).ticks(4,'.1~s'));
+    svg.append('text').attr('x',0).attr('y',15).text('Total sheet AC power (W, log) vs number of cells');
+    svg.append('text').attr('x',w-18).attr('y',214).attr('text-anchor','end').text('Cells');
+    for(const [key,color,label] of [['independent','var(--viz-series-3)','independent jets'],['shared','var(--viz-series-1)','shared source']]) {
+      svg.append('path').datum(rows.filter(r=>r[key]>0)).attr('fill','none').attr('stroke',color).attr('stroke-width',2).attr('d',d3.line().x(d=>x(d.cells)).y(d=>y(d[key])));
+      const lastRow=rows.filter(r=>r[key]>0).at(-1);
+      if(lastRow)svg.append('text').attr('x',x(lastRow.cells)-4).attr('y',y(lastRow[key])+(key==='shared'?14:-6)).attr('text-anchor','end').attr('fill',color).text(label);
+    }
+    svg.append('circle').attr('cx',x(model.cells)).attr('cy',y(model.power)).attr('r',4).attr('fill','var(--foreground)');
+  }
+  function inspect(event,node,x) {
+    phase=Math.max(0,Math.min(1,x.invert(d3.pointer(event,node)[0])/model.p.period));
+    stop();renderPhase();
+    const pt=sample(model.cell,phase*model.p.period),tip=$('.tip'),rect=root.getBoundingClientRect();
+    tip.hidden=false;tip.textContent=`${fmt(pt.t)} s · ${fmt(pt.q*1000)} mm · ${fmt(pt.voltage)} V per cell`;
+    tip.style.left=Math.max(0,Math.min(root.clientWidth-tip.offsetWidth,event.clientX-rect.left+8))+'px';
+    tip.style.top=event.clientY-rect.top-42+'px';
+  }
+  function renderPhase() {
+    const pt=sample(model.cell,phase*model.p.period),rel=model.peakQ>0?Math.abs(pt.q)/model.peakQ:0;
+    d3.select($('.cells')).selectAll('rect').attr('opacity',0.25+0.75*rel);
+    $('#phase').value=Math.round(phase*1000);$('#phase-value').textContent=fmt(pt.t)+' s';
+    $('#instant').textContent=`Water ${fmt(pt.u)} m/s · bend ${fmt(pt.q*1000)} mm · ${fmt(pt.voltage)} V per cell · sheet ${watts(pt.power*model.cells)}`;
+    for(const v of plotScales){v.svg.select('.cursor').attr('x1',v.x(pt.t)).attr('x2',v.x(pt.t));v.svg.select('.marker').attr('cx',v.x(pt.t)).attr('cy',v.y(pt[v.key]*v.mult));}
+  }
+  function metrics() {
+    $('#metrics').replaceChildren();
+    const rows=[['Total sheet AC power',watts(model.power)],['Per cell',watts(model.perCell)],['Sheet area',fmt(model.area*1e4,0)+' cm²'],
+      ['Power density',watts(model.density)+'/m²'],['Total jet input',watts(model.jetPower)],['Energy per pulse (sheet)',fmt(model.power*model.p.period*1e6)+' µJ'],
+      ['Peak piezo strain',fmt(model.strain*1e6,0)+' µε'],['Cell natural frequency',fmt(model.frequency)+' Hz']];
+    for(const [label,value] of rows){const box=document.createElement('div'),name=document.createElement('span'),v=document.createElement('strong');name.className='text-small';name.textContent=label;v.textContent=value;box.append(name,v);$('#metrics').append(box);}
+    $('#limits').textContent=model.issues.length?model.issues.join(' '):`Within selected screening limits · conversion ${fmt(model.power/Math.max(1e-30,model.jetPower)*100,4)}% of jet input.`;
+    $('#limits').classList.toggle('error',!!model.issues.length);
+    let charge='Charge estimate suppressed outside model limits.';
+    if(!model.issues.length)charge=model.hours===null?'No estimated charging power.':`Assumed battery delivery ${watts(model.net)} · ${fmt(model.p.battery)} Wh recharge: ${model.hours>8766?fmt(model.hours/8766,0)+' years':fmt(model.hours)+' hours'} of continuous identical pulses.`;
+    $('#charging').textContent=charge+(model.sharing==='independent'?' Independent mode assumes the pump can supply every cell its own jet; total jet input above must come from the wave-to-water stage.':' Shared mode keeps the source fixed: more cells means smaller jets per cell and less total power.')+' No charger startup, leakage or station loads modeled.';
+  }
+  function redraw(){scene();plotScales=[];sweepChart();chart('#bend-plot','q',1000,'Per-cell tip displacement (mm)','var(--viz-series-2)');chart('#voltage-plot','voltage',1,'Per-cell load voltage (V)','var(--viz-series-1)');renderPhase();}
+  function update() {
+    try {model=simulateSheet(settings);sweep=sheetSweep(settings);$('#validation').textContent='';$('#play').disabled=false;$('#phase').disabled=false;$('.scene').style.opacity='1';metrics();redraw();}
+    catch(error) {stop();$('#validation').textContent=error.message+' Display retains the last valid inputs.';$('#play').disabled=true;$('#phase').disabled=true;$('.scene').style.opacity='0.35';$('#charging').textContent='No estimate: invalid inputs.';}
+  }
+  function stop() {playing=false;cancelAnimationFrame(frame);$('#play').textContent='Play cycle';}
+  function tick(now) {if(!playing)return;phase=(phase+Math.min((now-last)/1000,0.1)/model.p.period)%1;last=now;renderPhase();frame=requestAnimationFrame(tick);}
+  $('#play').addEventListener('click',()=>{if(playing){stop();return;}playing=true;last=performance.now();$('#play').textContent='Pause';frame=requestAnimationFrame(tick);});
+  $('#phase').addEventListener('input',event=>{stop();phase=Number(event.target.value)/1000;renderPhase();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+  new ResizeObserver(redraw).observe(root);
+  update();
+})();
+</script></body></html>

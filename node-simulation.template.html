@@ -1,0 +1,187 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pendulum wave node → AUV charger</title><style>
+:root {color-scheme:light dark;--background:light-dark(#fff,#16191b);--foreground:light-dark(#202a30,#e1e9ee);--border:light-dark(#bdc7cd,#52616a);--muted-foreground:light-dark(#53636f,#a7b8c3);--popover:var(--background);--popover-foreground:var(--foreground);--destructive:light-dark(#a62920,#ff9e96);--viz-series-1:light-dark(#006b9f,#6bc8f5);--viz-series-2:light-dark(#99400a,#fdb87d);--viz-series-3:light-dark(#2e7d4f,#7fd6a0);--water:light-dark(#d7ecf5,#22343f);--band:light-dark(#fff1d6,#3a2f14);}
+body {max-width:960px;margin:24px auto;padding:0 20px;background:var(--background);color:var(--foreground);font:16px/1.5 system-ui,sans-serif}
+h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .text-small {font-size:0.875rem} .btn {font:inherit;padding:6px 14px;border:1px solid var(--border);border-radius:5px;background:var(--background);color:var(--foreground)} a {color:var(--viz-series-1)} footer {margin:24px 0;color:var(--muted-foreground)}
+</style></head><body><div id="pendulum-node">
+  <style>
+    #pendulum-node {color:var(--foreground);font-family:system-ui,sans-serif;position:relative}
+    #pendulum-node * {box-sizing:border-box}
+    #pendulum-node .controls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;margin:16px 0}
+    #pendulum-node label {display:block;min-width:0}
+    #pendulum-node input[type=range] {width:100%;accent-color:var(--viz-series-1)}
+    #pendulum-node input[type=number] {width:100%;min-height:38px;color:var(--foreground);background:var(--background);border:1px solid var(--border);padding:6px}
+    #pendulum-node output {font-variant-numeric:tabular-nums}
+    #pendulum-node .row {display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    #pendulum-node .metrics {display:flex;gap:14px 30px;flex-wrap:wrap;margin:12px 0}
+    #pendulum-node .metrics span {display:block}
+    #pendulum-node button {cursor:pointer;min-height:36px}
+    #pendulum-node .scene {display:block;width:100%;height:300px}
+    #pendulum-node svg text {fill:var(--foreground);font-size:12px;font-weight:400}
+    #pendulum-node .charts {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    #pendulum-node .chart {width:100%;height:180px;display:block}
+    #pendulum-node .wide {grid-column:1/-1;height:220px}
+    #pendulum-node .tip {position:absolute;pointer-events:none;padding:8px;background:var(--popover);color:var(--popover-foreground);border:1px solid var(--border);z-index:2}
+    #pendulum-node .error {color:var(--destructive)}
+    #pendulum-node .phase {flex:1;min-width:150px}
+    #pendulum-node summary {cursor:pointer;padding:8px 0}
+    #pendulum-node .readout {min-height:2.5em;font-variant-numeric:tabular-nums}
+    #pendulum-node .busy {opacity:.6}
+    #pendulum-node .verdict {padding:10px 14px;border:1px solid var(--border);border-left:4px solid var(--viz-series-3);margin:12px 0}
+    #pendulum-node .verdict.short {border-left-color:var(--destructive)}
+    @media(max-width:480px) {#pendulum-node .charts {grid-template-columns:1fr} #pendulum-node .controls {gap:12px}}
+  </style>
+  <h2>Proposed node: sealed pendulum → generator → battery → dock → AUV</h2>
+  <div class="text-small">Coupled screening model · regular waves · hull pitch + pendulum on the wave orbit · generator damping auto-matched · 24 h charge budget</div>
+  <div class="controls" id="primary-controls"></div>
+  <details>
+    <summary>Hull, pendulum, drive train, storage &amp; dock assumptions</summary>
+    <div class="text-small">A horizontal cylinder floats like a log and follows the wave (pitch from the wave slope, surge/heave from the orbit). Inside, a physical pendulum on a transverse shaft lags the hull; the generator resists the relative rotation. A torsion spring (negative when needed) tunes the pendulum to the wave period with a long arm so it keeps a full stroke; end-stops bound the swing. Generator damping 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
+    <div class="controls" id="advanced-controls"></div>
+  </details>
+  <div id="validation" role="alert" class="error"></div>
+  <svg class="scene" role="img" aria-label="A cylindrical hull pitches and heaves on a wave; a pendulum inside swings relative to it."></svg>
+  <div class="row">
+    <button id="play" type="button" class="btn">Play</button>
+    <label class="phase">Time <output id="phase-value">0 s</output><input id="phase" type="range" min="0" max="1000" value="0" aria-label="Time in the three-cycle window"></label>
+  </div>
+  <div class="readout text-small" id="instant"></div>
+  <div class="metrics" aria-live="polite" id="metrics"></div>
+  <div class="verdict" id="verdict"></div>
+  <div class="charts">
+    <svg class="chart" id="angle-plot" role="img" aria-label="Hull pitch and pendulum angle"></svg>
+    <svg class="chart" id="power-plot" role="img" aria-label="Electrical power"></svg>
+    <svg class="chart wide" id="budget-plot" role="img" aria-label="Node battery state of charge over 24 hours with one AUV charging session"></svg>
+  </div>
+  <div class="text-small" id="limits" aria-live="polite"></div>
+  <div class="text-small" id="charging" aria-live="polite"></div>
+  <div class="tip" role="tooltip" hidden></div>
+</div>
+<footer class="text-small">Source: <code>node-model.mjs</code> (checked by <code>node check-node.mjs</code>). Rebuild with <code>node build.mjs</code>; sweeps in <code>RESULTS.md</code> via <code>node run.mjs</code>.</footer>
+
+<script>
+// https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock
+/*__D3__*/
+</script>
+<script>
+/*__MODEL__*/
+
+(() => {
+  const root=document.getElementById('pendulum-node'),$=s=>root.querySelector(s);
+  const primary=[['height','Wave height','m',0.1],['period','Wave period','s',0.5],
+    ['hullLength','Hull length','m',0.5],['hullDiameter','Hull diameter','m',0.1],
+    ['pendulumMass','Pendulum mass','kg',100],['armLength','Pendulum arm (COG offset)','m',0.05],
+    ['dockPowerW','Dock charge power','W',50],['auvWh','AUV pack','Wh',100]];
+  const advanced=[['hullMass','Hull mass (excl. pendulum)','kg',100],['hullDamping','Hull pitch damping ratio','',0.01],
+    ['gyrationRadius','Pendulum radius of gyration','m',0.05],['friction','Shaft friction','N·m·s/rad',10],
+    ['generatorDamping','Generator damping (0 = auto)','N·m·s/rad',100],['springTuning','Spring tuning (0 gravity only … 1 tuned to wave)','',0.1],
+    ['stopAngle','End-stop angle','°',5],['driveEfficiency','Generator + electronics efficiency','',0.05],
+    ['availability','Fraction of time at this sea state','',0.05],['nodeBatteryWh','Node battery','Wh',500],
+    ['dockEfficiency','Dock transfer efficiency','',0.05],['auvArrivalSoc','AUV arrival state of charge','',0.05],['initialSoc','Node battery at session start','',0.05]];
+  const settings={...nodeDefaults};
+  let model=simulateNode(settings),time=0,playing=false,last=0,frame,plotScales=[],timer;
+  const fmt=(v,d=2)=>Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
+  const watts=v=>v<1?fmt(v*1000)+' mW':v<1000?fmt(v,0)+' W':fmt(v/1000,2)+' kW';
+  const deg=r=>fmt(r*180/Math.PI,1)+'°';
+  function controls(items,target,type) {
+    for(const [key,label,unit,step] of items) {
+      const box=document.createElement('label'),out=document.createElement('output'),input=document.createElement('input');
+      box.append(label+' ',out);out.textContent=fmt(settings[key])+' '+unit;
+      Object.assign(input,{type,min:nodeBounds[key][0],max:nodeBounds[key][1],step,value:settings[key],id:'p-'+key});
+      input.addEventListener('input',()=>{settings[key]=input.value===''?NaN:Number(input.value);out.textContent=input.value+' '+unit;schedule();});
+      box.append(input);$(target).append(box);
+    }
+  }
+  controls(primary,'#primary-controls','range');controls(advanced,'#advanced-controls','number');
+  const peak=key=>Math.max(1e-12,...model.points.map(p=>Math.abs(p[key])));
+  function scene() {
+    const svg=d3.select($('.scene')),w=$('.scene').clientWidth;
+    svg.attr('viewBox',`0 0 ${w} 300`).selectAll('*').remove();
+    svg.append('rect').attr('x',0).attr('y',150).attr('width',w).attr('height',150).attr('fill','var(--water)');
+    svg.append('path').attr('class','surface').attr('fill','none').attr('stroke','var(--viz-series-1)').attr('stroke-width',2);
+    const g=svg.append('g').attr('class','hull');
+    g.append('rect').attr('class','body').attr('fill','var(--background)').attr('stroke','var(--foreground)').attr('stroke-width',2);
+    g.append('line').attr('class','arm').attr('stroke','var(--foreground)').attr('stroke-width',4).attr('stroke-linecap','round');
+    g.append('circle').attr('class','bob').attr('r',12).attr('fill','var(--viz-series-2)').attr('stroke','var(--foreground)');
+    g.append('circle').attr('r',4).attr('fill','var(--foreground)');
+    svg.append('text').attr('x',12).attr('y',22).text('Hull follows the wave · pendulum lags · generator on the shaft');
+    svg.append('text').attr('class','scale').attr('x',12).attr('y',290);
+  }
+  function chart(selector,series,label,xmax,xlabel) {
+    const node=$(selector),w=node.clientWidth,h=180,svg=d3.select(node);
+    svg.attr('viewBox',`0 0 ${w} ${h}`).selectAll('*').remove();
+    const vals=series.flatMap(s=>model.points.map(p=>p[s.key]*s.mult)),ext=d3.extent([...vals,0]),pad=(ext[1]-ext[0]||1)*0.12;
+    const x=d3.scaleLinear().domain([0,xmax]).range([67,w-18]),y=d3.scaleLinear().domain([ext[0]-pad,ext[1]+pad]).range([139,29]);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',110).attr('fill','none').attr('stroke','var(--border)');
+    svg.append('g').attr('transform','translate(0,139)').call(d3.axisBottom(x).ticks(w<360?3:4));
+    svg.append('g').attr('transform','translate(67,0)').call(d3.axisLeft(y).ticks(3).tickFormat(d3.format('.2~g')));
+    svg.append('text').attr('x',0).attr('y',15).text(label);
+    svg.append('text').attr('x',w-18).attr('y',176).attr('text-anchor','end').text(xlabel);
+    for(const s of series)svg.append('path').datum(model.points).attr('fill','none').attr('stroke',s.color).attr('stroke-width',s.width||2).attr('stroke-dasharray',s.dash||null).attr('d',d3.line().x(d=>x(d.t)).y(d=>y(d[s.key]*s.mult)));
+    svg.append('line').attr('class','cursor').attr('y1',29).attr('y2',139).attr('stroke','var(--foreground)').attr('stroke-dasharray','3 3');
+    const marker=svg.append('circle').attr('r',3).attr('fill',series[0].color);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',110).attr('fill','transparent').on('pointermove',event=>inspect(event,node,x)).on('pointerleave',()=>{$('.tip').hidden=true;});
+    plotScales.push({svg,x,y,key:series[0].key,mult:series[0].mult,marker});
+  }
+  function budgetChart() {
+    const node=$('#budget-plot'),w=node.clientWidth,h=220,svg=d3.select(node),tl=model.timeline,p=model.a.p;
+    svg.attr('viewBox',`0 0 ${w} ${h}`).selectAll('*').remove();
+    const x=d3.scaleLinear().domain([0,24]).range([67,w-18]),y=d3.scaleLinear().domain([0,p.nodeBatteryWh]).range([179,29]);
+    svg.append('rect').attr('x',x(0)).attr('y',29).attr('width',x(Math.min(24,model.sessionHours))-x(0)).attr('height',150).attr('fill','var(--band)');
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',150).attr('fill','none').attr('stroke','var(--border)');
+    svg.append('g').attr('transform','translate(0,179)').call(d3.axisBottom(x).ticks(8));
+    svg.append('g').attr('transform','translate(67,0)').call(d3.axisLeft(y).ticks(4).tickFormat(d3.format('.2~s')));
+    svg.append('text').attr('x',0).attr('y',15).text(`Node battery (Wh) over 24 h · shaded: AUV charging at ${watts(p.dockPowerW)} · generation ${watts(model.electrical*p.availability)} average (× availability)`);
+    svg.append('text').attr('x',w-18).attr('y',214).attr('text-anchor','end').text('Hours');
+    svg.append('path').datum(tl.points).attr('fill','none').attr('stroke','var(--viz-series-3)').attr('stroke-width',2).attr('d',d3.line().x(d=>x(d.h)).y(d=>y(d.socWh)));
+    svg.append('line').attr('x1',67).attr('x2',w-18).attr('y1',y(p.initialSoc*p.nodeBatteryWh)).attr('y2',y(p.initialSoc*p.nodeBatteryWh)).attr('stroke','var(--muted-foreground)').attr('stroke-dasharray','4 3');
+  }
+  function inspect(event,node,x) {
+    time=Math.max(0,Math.min(model.duration,x.invert(d3.pointer(event,node)[0])));stop();renderPhase();
+    const pt=nodeAt(model,time),tip=$('.tip'),rect=root.getBoundingClientRect();
+    tip.hidden=false;tip.textContent=`${fmt(pt.t)} s · pitch ${deg(pt.theta)} · pendulum ${deg(pt.psi)} · ${watts(pt.power)}`;
+    tip.style.left=Math.max(0,Math.min(root.clientWidth-tip.offsetWidth,event.clientX-rect.left+8))+'px';tip.style.top=event.clientY-rect.top-42+'px';
+  }
+  function renderPhase() {
+    const pt=nodeAt(model,time),w=$('.scene').clientWidth,cx=w/2,p=model.a.p;
+    const pxm=Math.min(28,(w-80)/Math.max(p.hullLength,4));                      // pixels per metre
+    const surface=d3.range(0,w+1,8).map(px=>[px,150-pxm*p.height/2*Math.cos(model.a.k*(px-cx)/pxm-model.a.w*pt.t)]);
+    d3.select($('.surface')).attr('d',d3.line().curve(d3.curveBasis)(surface));
+    d3.select($('.hull')).attr('transform',`translate(${cx+pxm*pt.surge},${150-pxm*pt.heave}) rotate(${-pt.theta*180/Math.PI})`);
+    d3.select($('.body')).attr('x',-pxm*p.hullLength/2).attr('y',-pxm*p.hullDiameter/2).attr('width',pxm*p.hullLength).attr('height',pxm*p.hullDiameter).attr('rx',pxm*p.hullDiameter/2);
+    const arm=pxm*Math.max(p.armLength,0.35*p.hullDiameter),ang=pt.psi-pt.theta;  // pendulum drawn relative to hull, exaggerated arm for visibility
+    d3.select($('.arm')).attr('x1',0).attr('y1',0).attr('x2',arm*Math.sin(ang)).attr('y2',arm*Math.cos(ang));
+    d3.select($('.bob')).attr('cx',arm*Math.sin(ang)).attr('cy',arm*Math.cos(ang));
+    $('.scale').textContent=`${fmt(pxm,1)} px/m · pendulum arm drawn at ≥35% of diameter for visibility`;
+    $('#phase').value=Math.round(time/model.duration*1000);$('#phase-value').textContent=fmt(pt.t)+' s';
+    $('#instant').textContent=`wave ${fmt(pt.wave,2)} m · pitch ${deg(pt.theta)} · pendulum ${deg(pt.psi)} (relative ${deg(pt.relative)}) · ${watts(pt.power)} · ${fmt(pt.energy/3600,2)} Wh this window`;
+    for(const v of plotScales){v.svg.select('.cursor').attr('x1',v.x(pt.t)).attr('x2',v.x(pt.t));v.marker.attr('cx',v.x(pt.t)).attr('cy',v.y(pt[v.key]*v.mult));}
+  }
+  function metrics() {
+    $('#metrics').replaceChildren();
+    const p=model.a.p,a=model.a,rows=[['Average electrical power',watts(model.electrical)],['Generator damping',fmt(model.cg,0)+' N·m·s/rad'+(model.searched?' (auto)':'')],
+      ['Capture width',fmt(model.captureWidth,2)+' m (limit '+fmt(model.limitWidth,1)+' m)'],['Peak pendulum swing',deg(model.peakPsi)],['Peak hull pitch',deg(model.peakPitch)],
+      ['Pendulum period',fmt(a.pendulumPeriod,2)+' s (gravity-only '+fmt(2*Math.PI*Math.sqrt(a.Ip/a.Kg),2)+' s)'],['Energy per day at this sea state',fmt(model.dailyWh/1000,2)+' kWh']];
+    for(const [label,value] of rows){const box=document.createElement('div'),name=document.createElement('span'),v=document.createElement('strong');name.className='text-small';name.textContent=label;v.textContent=value;box.append(name,v);$('#metrics').append(box);}
+    const tl=model.timeline,ok=tl.shortfallWh===0&&model.chargesPerDay>=1;
+    $('#verdict').className='verdict'+(ok?'':' short');
+    $('#verdict').textContent=`AUV needs ${fmt(model.auvNeedWh/1000,2)} kWh → ${fmt(model.sessionHours,1)} h at the dock. Waves supply ${fmt(model.chargesPerDay,2)} charges per day at this sea state and availability. Node battery bottoms at ${fmt(tl.minSocWh/1000,2)} kWh and ends the day at ${fmt(tl.endSocWh/1000,2)} kWh`+(tl.shortfallWh>0?` with a ${fmt(tl.shortfallWh/1000,2)} kWh shortfall: the session cannot finish.`:tl.recovered?'; the battery recovers within the day.':'; the battery does not fully recover within the day.');
+    $('#limits').textContent=model.issues.length?model.issues.join(' '):`Within screening limits · ${model.steps.toLocaleString()} solver steps · energy residual ${(model.residual/Math.max(Math.abs(model.inputWork),1e-9)).toExponential(1)} of wave work`;
+    $('#limits').classList.toggle('error',!!model.issues.length);
+    $('#charging').textContent=(model.issues.length?'Charging figures are shown but the wave model is outside its screening limits. ':'')+'Regular waves only; availability scales a single sea state, it is not a wave climate. Not modeled: irregular seas, mooring, end-stop impacts beyond a stiff stop, generator thermal limits, storm submergence, biofouling, battery ageing, docking failures.';
+  }
+  function redraw(){scene();plotScales=[];chart('#angle-plot',[{key:'psi',mult:180/Math.PI,color:'var(--viz-series-2)'},{key:'theta',mult:180/Math.PI,color:'var(--viz-series-1)',dash:'4 3',width:1.5}],'Pendulum (orange) and hull pitch (blue), °',model.duration,'Time (s)');chart('#power-plot',[{key:'power',mult:1,color:'var(--viz-series-3)'}],'Electrical power (W)',model.duration,'Time (s)');budgetChart();renderPhase();}
+  function schedule(){clearTimeout(timer);root.classList.add('busy');timer=setTimeout(update,200);}
+  function update() {
+    try {model=simulateNode(settings);time=Math.min(time,model.duration);$('#validation').textContent='';$('#play').disabled=false;$('#phase').disabled=false;$('.scene').style.opacity='1';metrics();redraw();}
+    catch(error) {stop();$('#validation').textContent=error.message+' Display retains the last valid inputs.';$('#play').disabled=true;$('#phase').disabled=true;$('.scene').style.opacity='0.35';}
+    root.classList.remove('busy');
+  }
+  function stop(){playing=false;cancelAnimationFrame(frame);$('#play').textContent='Play';}
+  function tick(now){if(!playing)return;time=(time+Math.min((now-last)/1000,0.1))%model.duration;last=now;renderPhase();frame=requestAnimationFrame(tick);}
+  $('#play').addEventListener('click',()=>{if(playing){stop();return;}playing=true;last=performance.now();$('#play').textContent='Pause';frame=requestAnimationFrame(tick);});
+  $('#phase').addEventListener('input',event=>{stop();time=Number(event.target.value)/1000*model.duration;renderPhase();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+  new ResizeObserver(redraw).observe(root);
+  update();
+})();
+</script></body></html>

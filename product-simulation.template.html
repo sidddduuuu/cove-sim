@@ -1,0 +1,186 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wave node → water pulse → piezo leaf</title><style>
+:root {color-scheme:light dark;--background:light-dark(#fff,#16191b);--foreground:light-dark(#202a30,#e1e9ee);--border:light-dark(#bdc7cd,#52616a);--muted-foreground:light-dark(#53636f,#a7b8c3);--popover:var(--background);--popover-foreground:var(--foreground);--destructive:light-dark(#a62920,#ff9e96);--viz-series-1:light-dark(#006b9f,#6bc8f5);--viz-series-2:light-dark(#99400a,#fdb87d);--viz-series-3:light-dark(#2e7d4f,#7fd6a0);--water:light-dark(#d7ecf5,#22343f);}
+body {max-width:960px;margin:24px auto;padding:0 20px;background:var(--background);color:var(--foreground);font:16px/1.5 system-ui,sans-serif}
+h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .text-small {font-size:0.875rem} .btn {font:inherit;padding:6px 14px;border:1px solid var(--border);border-radius:5px;background:var(--background);color:var(--foreground)} a {color:var(--viz-series-1)} footer {margin:24px 0;color:var(--muted-foreground)}
+</style></head><body><div id="wave-node">
+  <style>
+    #wave-node {color:var(--foreground);font-family:system-ui,sans-serif;position:relative}
+    #wave-node * {box-sizing:border-box}
+    #wave-node .controls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;margin:16px 0}
+    #wave-node label {display:block;min-width:0}
+    #wave-node input[type=range] {width:100%;accent-color:var(--viz-series-1)}
+    #wave-node input[type=number] {width:100%;min-height:38px;color:var(--foreground);background:var(--background);border:1px solid var(--border);padding:6px}
+    #wave-node output {font-variant-numeric:tabular-nums}
+    #wave-node .row {display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    #wave-node .metrics {display:flex;gap:14px 30px;flex-wrap:wrap;margin:12px 0}
+    #wave-node .metrics span {display:block}
+    #wave-node button {cursor:pointer;min-height:36px}
+    #wave-node .scene {display:block;width:100%;height:300px}
+    #wave-node svg text {fill:var(--foreground);font-size:12px;font-weight:400}
+    #wave-node .charts {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    #wave-node .chart {width:100%;height:180px;display:block}
+    #wave-node .tip {position:absolute;pointer-events:none;padding:8px;background:var(--popover);color:var(--popover-foreground);border:1px solid var(--border);z-index:2}
+    #wave-node .error {color:var(--destructive)}
+    #wave-node .phase {flex:1;min-width:150px}
+    #wave-node summary {cursor:pointer;padding:8px 0}
+    #wave-node .readout {min-height:2.5em;font-variant-numeric:tabular-nums}
+    #wave-node .busy {opacity:.6}
+    @media(max-width:480px) {#wave-node .charts {grid-template-columns:1fr} #wave-node .controls {gap:12px}}
+  </style>
+  <h2>Full product: wave → float → water column → jet → piezo leaf</h2>
+  <div class="text-small">Coupled screening model · regular waves · RK4 time integration · reports the last three settled wave cycles</div>
+  <div class="controls" id="primary-controls"></div>
+  <details>
+    <summary>Hull, damping, coupling, leaf, electrical &amp; charging assumptions</summary>
+    <div class="text-small">Float heaves on the wave; a vertical water tube under it pumps water through a nozzle onto the tip of a clamped PZT-5A/steel leaf (the strip model). One-way ideal routing; see MODEL.md for what is not modeled.</div>
+    <div class="controls" id="advanced-controls"></div>
+  </details>
+  <div id="validation" role="alert" class="error"></div>
+  <svg class="scene" role="img" aria-label="A float heaves on a wave; water in a tube below it is pumped through a nozzle onto a piezoelectric leaf."></svg>
+  <div class="row">
+    <button id="play" type="button" class="btn">Play</button>
+    <label class="phase">Time <output id="phase-value">0 s</output><input id="phase" type="range" min="0" max="1000" value="0" aria-label="Time in the three-cycle window"></label>
+  </div>
+  <div class="readout text-small" id="instant"></div>
+  <div class="metrics" aria-live="polite" id="metrics"></div>
+  <div class="charts">
+    <svg class="chart" id="heave-plot" role="img" aria-label="Wave elevation and float heave"></svg>
+    <svg class="chart" id="jet-plot" role="img" aria-label="Jet velocity"></svg>
+    <svg class="chart" id="bend-plot" role="img" aria-label="Leaf tip displacement"></svg>
+    <svg class="chart" id="voltage-plot" role="img" aria-label="Load voltage"></svg>
+  </div>
+  <div class="text-small" id="limits" aria-live="polite"></div>
+  <div class="text-small" id="charging" aria-live="polite"></div>
+  <div class="tip" role="tooltip" hidden></div>
+</div>
+<footer class="text-small">Sources: <code>model.mjs</code>, <code>full-model.mjs</code> (checked by <code>node check.mjs</code>, <code>node check-full.mjs</code>). Rebuild this page with <code>node build.mjs</code>.</footer>
+
+<script>
+// https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock
+/*__D3__*/
+</script>
+<script>
+/*__MODEL__*/
+
+(() => {
+  const root=document.getElementById('wave-node'),$=s=>root.querySelector(s);
+  const primary=[['height','Wave height','m',0.01],['period','Wave period','s',0.1],
+    ['tubeLength','Water tube length','m',0.1],['tubeDiameter','Water tube diameter','mm',1],
+    ['nozzle','Nozzle diameter','mm',0.5],['floatDiameter','Float diameter','m',0.05]];
+  const advanced=[['hullMass','Hull mass','kg',1],['hullDamping','Hull damping ratio','',0.01],
+    ['waterDamping','Water column damping ratio','',0.01],['coupling','Wave force coupling','',0.05],
+    ['leafLength','Leaf free length','mm',5],['resistance','Electrical load','MΩ',0.1],
+    ['efficiency','AC-to-battery fraction','',0.05],['dockEfficiency','Dock transfer fraction','',0.05],
+    ['batteryWh','Energy per AUV charge','Wh',1]];
+  const settings={...systemDefaults};
+  let model=simulateSystem(settings),time=0,playing=false,last=0,frame,plotScales=[],timer;
+  const fmt=(v,d=2)=>Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
+  const watts=v=>v<0.001?fmt(v*1e6)+' µW':v<1?fmt(v*1000)+' mW':fmt(v)+' W';
+  function controls(items,target,type) {
+    for(const [key,label,unit,step] of items) {
+      const box=document.createElement('label'),out=document.createElement('output'),input=document.createElement('input');
+      box.append(label+' ',out);out.textContent=fmt(settings[key])+' '+unit;
+      Object.assign(input,{type,min:systemBounds[key][0],max:systemBounds[key][1],step,value:settings[key],id:'p-'+key});
+      input.addEventListener('input',()=>{settings[key]=input.value===''?NaN:Number(input.value);out.textContent=input.value+' '+unit;schedule();});
+      box.append(input);$(target).append(box);
+    }
+  }
+  controls(primary,'#primary-controls','range');controls(advanced,'#advanced-controls','number');
+  const peak=key=>Math.max(1e-12,...model.points.map(p=>Math.abs(p[key])));
+  function scene() {
+    const svg=d3.select($('.scene')),w=$('.scene').clientWidth;
+    svg.attr('viewBox',`0 0 ${w} 300`).selectAll('*').remove();
+    svg.append('rect').attr('class','sea').attr('x',0).attr('y',120).attr('width',w).attr('height',180).attr('fill','var(--water)');
+    svg.append('path').attr('class','surface').attr('fill','none').attr('stroke','var(--viz-series-1)').attr('stroke-width',2);
+    const g=svg.append('g').attr('class','hull');
+    g.append('rect').attr('x',-60).attr('y',-22).attr('width',120).attr('height',44).attr('rx',10).attr('fill','var(--background)').attr('stroke','var(--foreground)').attr('stroke-width',2);
+    g.append('rect').attr('x',-14).attr('y',22).attr('width',28).attr('height',120).attr('fill','none').attr('stroke','var(--foreground)').attr('stroke-width',2);
+    g.append('rect').attr('class','column').attr('x',-12).attr('y',82).attr('width',24).attr('height',58).attr('fill','var(--viz-series-1)').attr('opacity',.55);
+    g.append('rect').attr('x',-6).attr('y',8).attr('width',12).attr('height',16).attr('fill','var(--muted-foreground)');
+    g.append('rect').attr('class','jet').attr('x',-3).attr('y',-14).attr('width',6).attr('height',22).attr('fill','var(--viz-series-1)');
+    g.append('rect').attr('x',-46).attr('y',-20).attr('width',10).attr('height',12).attr('fill','var(--muted-foreground)');
+    g.append('path').attr('class','beam').attr('fill','none').attr('stroke','var(--foreground)').attr('stroke-width',4);
+    g.append('path').attr('class','piezo').attr('fill','none').attr('stroke','var(--viz-series-2)').attr('stroke-width',2.5);
+    svg.append('text').attr('x',12).attr('y',22).text('Float heaves with the wave · tube pumps water · jet bends the leaf');
+    svg.append('text').attr('class','scale').attr('x',12).attr('y',290);
+  }
+  function chart(selector,series,label) {
+    const node=$(selector),w=node.clientWidth,h=180,svg=d3.select(node);
+    svg.attr('viewBox',`0 0 ${w} ${h}`).selectAll('*').remove();
+    const vals=series.flatMap(s=>model.points.map(p=>p[s.key]*s.mult)),ext=d3.extent([...vals,0]);
+    const pad=(ext[1]-ext[0]||1)*0.12;
+    const x=d3.scaleLinear().domain([0,model.duration]).range([67,w-18]);
+    const y=d3.scaleLinear().domain([ext[0]-pad,ext[1]+pad]).range([139,29]);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',110).attr('fill','none').attr('stroke','var(--border)');
+    svg.append('g').attr('transform','translate(0,139)').call(d3.axisBottom(x).ticks(w<360?3:4));
+    svg.append('g').attr('transform','translate(67,0)').call(d3.axisLeft(y).ticks(3).tickFormat(d3.format('.2~g')));
+    svg.append('text').attr('x',0).attr('y',15).text(label);
+    svg.append('text').attr('x',w-18).attr('y',176).attr('text-anchor','end').text('Time (s)');
+    for(const s of series) svg.append('path').datum(model.points).attr('fill','none').attr('stroke',s.color).attr('stroke-width',s.width||2).attr('stroke-dasharray',s.dash||null).attr('d',d3.line().x(d=>x(d.t)).y(d=>y(d[s.key]*s.mult)));
+    svg.append('line').attr('class','cursor').attr('y1',29).attr('y2',139).attr('stroke','var(--foreground)').attr('stroke-dasharray','3 3');
+    const marker=svg.append('circle').attr('class','marker').attr('r',3).attr('fill',series[0].color);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',110).attr('fill','transparent')
+      .on('pointermove',event=>inspect(event,node,x)).on('pointerleave',()=>{$('.tip').hidden=true;});
+    plotScales.push({svg,x,y,key:series[0].key,mult:series[0].mult,marker});
+  }
+  function inspect(event,node,x) {
+    time=Math.max(0,Math.min(model.duration,x.invert(d3.pointer(event,node)[0])));
+    stop();renderPhase();
+    const pt=systemAt(model,time),tip=$('.tip'),rect=root.getBoundingClientRect();
+    tip.hidden=false;tip.textContent=`${fmt(pt.t)} s · heave ${fmt(pt.z*1000,0)} mm · jet ${fmt(pt.jet)} m/s · bend ${fmt(pt.q*1000)} mm · ${fmt(pt.voltage)} V`;
+    tip.style.left=Math.max(0,Math.min(root.clientWidth-tip.offsetWidth,event.clientX-rect.left+8))+'px';
+    tip.style.top=event.clientY-rect.top-42+'px';
+  }
+  function renderPhase() {
+    const pt=systemAt(model,time),w=$('.scene').clientWidth,cx=w/2;
+    const hMax=Math.max(model.a.p.height/2,peak('z')),zScale=hMax>0?45/hMax:0;
+    const surface=d3.range(0,w+1,8).map(px=>[px,120-zScale*pt.wave*Math.cos((px-cx)/Math.max(1,w/2)*Math.PI/2)]);
+    d3.select($('.surface')).attr('d',d3.line().curve(d3.curveBasis)(surface));
+    d3.select($('.hull')).attr('transform',`translate(${cx},${120-zScale*pt.z})`);
+    const xScale=30/Math.max(1e-9,peak('x'));
+    d3.select($('.column')).attr('y',82-xScale*pt.x).attr('height',Math.max(2,58+xScale*pt.x));
+    d3.select($('.jet')).attr('opacity',model.peakJet>0?0.1+0.8*pt.jet/model.peakJet:0).attr('height',model.peakJet>0?10+30*pt.jet/model.peakJet:4).attr('y',model.peakJet>0?8-(10+30*pt.jet/model.peakJet):4);
+    const L=model.a.s.L,mag=Math.min(3,60/Math.max(1e-12,80*peak('q')/L));
+    const shape=d3.range(21).map(i=>{const s=i/20;return [-36+s*80,-14-mag*80*pt.q/L*s*s*(3-s)/2];});
+    d3.select($('.beam')).attr('d',d3.line()(shape));
+    d3.select($('.piezo')).attr('d',d3.line()(shape.map(([x,y])=>[x,y-4])));
+    $('.scale').textContent=`Heave scale ${fmt(zScale/1000,2)} px/mm · leaf bend ×${fmt(mag,1)} · not to scale`;
+    $('#phase').value=Math.round(time/model.duration*1000);$('#phase-value').textContent=fmt(pt.t)+' s';
+    $('#instant').textContent=`wave ${fmt(pt.wave*1000,0)} mm · heave ${fmt(pt.z*1000,0)} mm · column ${fmt(pt.waterVelocity)} m/s · jet ${fmt(pt.jet)} m/s · bend ${fmt(pt.q*1000)} mm · ${fmt(pt.voltage)} V · ${watts(pt.power)} · ${fmt(pt.energy*1e6)} µJ so far`;
+    for(const v of plotScales){v.svg.select('.cursor').attr('x1',v.x(pt.t)).attr('x2',v.x(pt.t));v.marker.attr('cx',v.x(pt.t)).attr('cy',v.y(pt[v.key]*v.mult));}
+  }
+  function metrics() {
+    $('#metrics').replaceChildren();
+    const p=model.a.p,rows=[['Average AC load power',watts(model.power)],['Energy per wave cycle',fmt(model.power*p.period*1e6)+' µJ'],
+      ['Peak jet speed',fmt(model.peakJet)+' m/s'],['Peak leaf bend',fmt(model.peakQ*1000)+' mm'],['Peak piezo strain',fmt(model.strain*1e6,0)+' µε'],
+      ['Water column natural period',fmt(model.waterPeriod)+' s (wave '+fmt(p.period)+' s)']];
+    for(const [label,value] of rows){const box=document.createElement('div'),name=document.createElement('span'),v=document.createElement('strong');name.className='text-small';name.textContent=label;v.textContent=value;box.append(name,v);$('#metrics').append(box);}
+    $('#limits').textContent=model.issues.length?model.issues.join(' '):`Within screening limits · ${model.steps.toLocaleString()} solver steps · energy residual ${model.residual.toExponential(1)} J`;
+    $('#limits').classList.toggle('error',!!model.issues.length);
+    let charge='Charge estimate suppressed outside model limits.';
+    if(!model.issues.length){const hours=model.net>0?p.batteryWh/model.net:null;charge=hours===null?'No estimated charging power.':`Assumed delivery to a docked vehicle ${watts(model.net)} (AC × ${p.efficiency} × dock ${p.dockEfficiency}) · ${fmt(p.batteryWh)} Wh recharge: ${hours>8766?fmt(hours/8766,0)+' years':fmt(hours)+' hours'} of identical regular waves.`;}
+    $('#charging').textContent=charge+' No charger startup, leakage, station loads, irregular seas or survival loads modeled.';
+  }
+  function redraw() {
+    scene();plotScales=[];
+    chart('#heave-plot',[{key:'z',mult:1000,color:'var(--viz-series-3)'},{key:'wave',mult:1000,color:'var(--viz-series-1)',dash:'4 3',width:1.5}],'Float heave (green) and wave (mm)');
+    chart('#jet-plot',[{key:'jet',mult:1,color:'var(--viz-series-1)'}],'Jet speed (m/s)');
+    chart('#bend-plot',[{key:'q',mult:1000,color:'var(--viz-series-2)'}],'Leaf tip displacement (mm)');
+    chart('#voltage-plot',[{key:'voltage',mult:1,color:'var(--viz-series-1)'}],'Load voltage (V)');
+    renderPhase();
+  }
+  function schedule(){clearTimeout(timer);root.classList.add('busy');timer=setTimeout(update,150);}
+  function update() {
+    try {model=simulateSystem(settings);time=Math.min(time,model.duration);$('#validation').textContent='';$('#play').disabled=false;$('#phase').disabled=false;$('.scene').style.opacity='1';metrics();redraw();}
+    catch(error) {stop();$('#validation').textContent=error.message+' Display retains the last valid inputs.';$('#play').disabled=true;$('#phase').disabled=true;$('.scene').style.opacity='0.35';$('#charging').textContent='No estimate: invalid inputs.';}
+    root.classList.remove('busy');
+  }
+  function stop() {playing=false;cancelAnimationFrame(frame);$('#play').textContent='Play';}
+  function tick(now) {if(!playing)return;time=(time+Math.min((now-last)/1000,0.1))%model.duration;last=now;renderPhase();frame=requestAnimationFrame(tick);}
+  $('#play').addEventListener('click',()=>{if(playing){stop();return;}playing=true;last=performance.now();$('#play').textContent='Pause';frame=requestAnimationFrame(tick);});
+  $('#phase').addEventListener('input',event=>{stop();time=Number(event.target.value)/1000*model.duration;renderPhase();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+  new ResizeObserver(redraw).observe(root);
+  update();
+})();
+</script></body></html>

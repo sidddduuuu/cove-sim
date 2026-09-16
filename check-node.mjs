@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {simulateNode,nodeRates,nodeEnergy,nodeParameters,nodeAt,chargeTimeline,nodeDefaults} from './node-model.mjs';
+const a=nodeParameters(),cg=1000,y=[.02,.03,.1,-.05,0,0,0],rates=nodeRates(.3,y,a,cg),h=1e-6;
+const dE=(nodeEnergy(y.map((v,i)=>v+h*rates[i]),a)-nodeEnergy(y.map((v,i)=>v-h*rates[i]),a))/(2*h);
+assert.ok(Math.abs(dE-(rates[4]-rates[5]-rates[6]))<1e-6*Math.max(1,Math.abs(dE)),'Differential energy identity');
+const m=simulateNode({height:0.5}),fine=simulateNode({height:0.5},0.5);
+assert.ok(m.electrical>0&&Number.isFinite(m.electrical));
+assert.ok(Math.abs(m.residual)/Math.abs(m.inputWork)<1e-5,'Integrated energy residual (no end-stop contact)');
+assert.ok(Math.abs(m.electrical-fine.electrical)/fine.electrical<0.01,'Step-halving convergence');
+assert.ok(m.searched&&m.cg>0);
+const fixed=simulateNode({height:0.5,generatorDamping:m.cg});
+assert.ok(Math.abs(fixed.electrical-m.electrical)/m.electrical<1e-9,'Fixed damping reproduces the searched optimum');
+assert.ok(simulateNode({height:0.5,generatorDamping:m.cg*4}).electrical<m.electrical,'Optimum is a maximum');
+assert.equal(simulateNode({height:0}).electrical,0);
+assert.equal(simulateNode({height:0.5,driveEfficiency:0}).electrical,0);
+assert.ok(simulateNode({height:0.5,springTuning:0}).electrical<m.electrical,'Spring tuning helps at long periods');
+assert.ok(Math.abs(nodeParameters().pendulumPeriod-nodeDefaults.period)<1e-6&&Math.abs(nodeParameters({period:9}).pendulumPeriod-9)<1e-6,'Tuned pendulum period equals the wave period');
+assert.ok(Math.abs(nodeAt(m,m.duration*2).energy-2*m.generated*m.duration)<1e-6,'Cumulative energy across loops');
+const tl=chargeTimeline({...nodeDefaults},1000,3);
+assert.ok(tl.points.length>400&&tl.minSocWh<nodeDefaults.initialSoc*nodeDefaults.nodeBatteryWh);
+assert.ok(chargeTimeline({...nodeDefaults},0,3).shortfallWh===0&&chargeTimeline({...nodeDefaults,nodeBatteryWh:1000,initialSoc:0.5},0,3).shortfallWh>0,'Shortfall accounting');
+assert.throws(()=>simulateNode({period:0}),RangeError);
+assert.throws(()=>simulateNode({armLength:5}),RangeError);
+assert.throws(()=>simulateNode({hullMass:60000,hullLength:1}),RangeError);
+assert.throws(()=>nodeAt(m,-1),RangeError);
+const big=simulateNode({height:3});assert.ok(big.issues.length>0||big.peakPsi<=big.a.stop*1.02,'Large waves either flagged or within stops');
+for(const s of [{period:4},{period:10},{hullLength:4,hullDiameter:1.4,hullMass:1500,pendulumMass:400,gyrationRadius:0.6,armLength:0.5}]) {
+  const x=simulateNode(s);assert.ok(Number.isFinite(x.electrical)&&x.electrical>=0);
+  assert.ok(Math.abs(x.residual)/Math.max(Math.abs(x.inputWork),1e-9)<3e-2,'Energy balance within end-stop tolerance');
+}
+console.log('PASS: energy identity, integration balance, convergence, damping optimum, tuning, zero-wave, charge budget, validation, parameter extremes.');
+const d=simulateNode();
+console.log(JSON.stringify({electrical_W:d.electrical,generatorDamping:d.cg,peakPendulum_deg:d.peakPsi*180/Math.PI,peakPitch_deg:d.peakPitch*180/Math.PI,captureWidth_m:d.captureWidth,limit_m:d.limitWidth,dailyWh:d.dailyWh,sessionHours:d.sessionHours,chargesPerDay:d.chargesPerDay,minNodeSocWh:d.timeline.minSocWh,issues:d.issues},null,2));
