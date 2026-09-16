@@ -1,4 +1,4 @@
-# Swellport — wave-node simulations
+# Cove — wave-node simulations
 
 Screening models for a wave-powered charging station for ocean robots, and the two piezoelectric designs modelled first and rejected on the numbers.
 
