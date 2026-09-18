@@ -1,5 +1,5 @@
 // Sheet of piezo cells: N identical strips fed by a shared or independent pulsed source. See MODEL.md §Sheet.
-import {simulate,defaults,bounds} from './model.mjs';
+import {simulate,defaults,bounds} from '../strip/model.mjs';
 
 export const sheetDefaults=Object.freeze({...defaults,cells:10,sharing:'shared'});
 export const sheetBounds=Object.freeze({...bounds,cells:[1,1000]});

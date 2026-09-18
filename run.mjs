@@ -1,10 +1,10 @@
 // Runs both simulations across parameter sweeps and writes RESULTS.md.
 import {writeFileSync} from 'node:fs';
-import {simulate} from './model.mjs';
-import {simulateSheet} from './sheet.mjs';
-import {simulateSystem,systemDefaults} from './full-model.mjs';
-import {simulateNode,nodeDefaults} from './node-model.mjs';
-import {simulateTube,tubeParameters,tubeDefaults} from './tube-model.mjs';
+import {simulate} from './strip/model.mjs';
+import {simulateSheet} from './sheet/sheet.mjs';
+import {simulateSystem,systemDefaults} from './product/full-model.mjs';
+import {simulateNode,nodeDefaults} from './node/node-model.mjs';
+import {simulateTube,tubeParameters,tubeDefaults} from './tube/tube-model.mjs';
 const uW=v=>(v*1e6).toFixed(2),years=h=>h===null?'—':(h/8766).toLocaleString(undefined,{maximumFractionDigits:0});
 const lines=['# Simulation results','',`Generated ${new Date().toISOString().slice(0,10)} by \`node run.mjs\`. Screening-model outputs, not measurements. Defaults from MODEL.md unless a column says otherwise.`,''];
 const table=(head,rows)=>{lines.push('| '+head.join(' | ')+' |','|'+head.map(()=>'---').join('|')+'|');for(const r of rows)lines.push('| '+r.join(' | ')+' |');lines.push('');};

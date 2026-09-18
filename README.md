@@ -4,11 +4,11 @@ Screening models for a wave-powered charging station for ocean robots, and the p
 
 | Model | Source | Page | Checks |
 |---|---|---|---|
-| Piezo strip (one cell, pulsed jet) | `model.mjs` | `simulation.html` | `node check.mjs` |
-| Piezo sheet (cell size × cell count, shared or independent jets) | `sheet.mjs` | `sheet-simulation.html` | `node check-sheet.mjs` |
-| Full piezo product (float → water column → jet → leaf) | `full-model.mjs` | `product-simulation.html` | `node check-full.mjs` |
-| PVC pipe linear generator (magnet sliding through coils) | `tube-model.mjs` | `tube-simulation.html` | `node check-tube.mjs` |
-| Proposed node (sealed pendulum → generator → battery → dock → AUV) | `node-model.mjs` | `node-simulation.html` | `node check-node.mjs` |
+| Piezo strip (one cell, pulsed jet) | `strip/model.mjs` | `strip/simulation.html` | `node strip/check.mjs` |
+| Piezo sheet (cell size × cell count, shared or independent jets) | `sheet/sheet.mjs` | `sheet/sheet-simulation.html` | `node sheet/check-sheet.mjs` |
+| Full piezo product (float → water column → jet → leaf) | `product/full-model.mjs` | `product/product-simulation.html` | `node product/check-full.mjs` |
+| PVC pipe linear generator (magnet sliding through coils) | `tube/tube-model.mjs` | `tube/tube-simulation.html` | `node tube/check-tube.mjs` |
+| Proposed node (sealed pendulum → generator → battery → dock → AUV) | `node/node-model.mjs` | `node/node-simulation.html` | `node node/check-node.mjs` |
 
 The pages are self-contained and work offline (d3 is inlined). Rebuild them from the sources with `node build.mjs`; regenerate the parameter sweeps in `RESULTS.md` with `node run.mjs`. Equations, assumptions and limits are in `MODEL.md`.
 

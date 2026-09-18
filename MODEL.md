@@ -1,6 +1,6 @@
 # Pulsed water → piezoelectric strip
 
-This is a reproducible, first-order **screening model**, not a validated device design, CFD simulation, or model of Panthalassa's generator. Open `simulation.html` in a browser; it works offline. Press **Play cycle**, or scrub through a cycle. All controls recalculate the periodic solution.
+This is a reproducible, first-order **screening model**, not a validated device design, CFD simulation, or model of Panthalassa's generator. Open `strip/simulation.html` in a browser; it works offline. Press **Play cycle**, or scrub through a cycle. All controls recalculate the periodic solution.
 
 ## What is being modeled
 
@@ -106,11 +106,11 @@ These are heuristic checks, not certification. Other omitted effects include dis
 
 ## Reproduce and verify
 
-Run from this directory:
+Run from the repo root:
 
-    node check.mjs
+    node strip/check.mjs
 
-The checks exercise zero input, the differential equations, mechanical/electrical energy balance, independent time-sample averaging, force/power scaling, invalid inputs, out-of-range sizing suppression, and a period/load sweep. They verify implementation and internal consistency, not real-world accuracy. `model.mjs` is the editable calculation source; the browser deliverable embeds a copy so it works offline.
+The checks exercise zero input, the differential equations, mechanical/electrical energy balance, independent time-sample averaging, force/power scaling, invalid inputs, out-of-range sizing suppression, and a period/load sweep. They verify implementation and internal consistency, not real-world accuracy. `strip/model.mjs` is the editable calculation source; the browser deliverable embeds a copy so it works offline.
 
 JavaScript syntax and embedded-source consistency were also checked. Browser visual verification was unavailable because local-file navigation was blocked by the browser URL policy; responsive layout and live controls have not been visually verified.
 
@@ -121,34 +121,34 @@ JavaScript syntax and embedded-source consistency were also checked. Browser vis
 - [Erturk, Electromechanical Modeling of Piezoelectric Energy Harvesters, 2009](https://vtechworks.lib.vt.edu/items/11c4677d-91e2-4903-a03d-86fcf7d48fb7): coupled beam/circuit modeling framework. The geometry and prescribed-jet assumptions here are our own.
 - [Panthalassa CEO interview, May 28, 2026](https://www.latitudemedia.com/news/catalyst-building-inference-data-centers-on-the-high-seas/): hydraulic pumping inspiration, not the numerical source for the pulse used here.
 
-## Sheet model (`sheet.mjs`, `sheet-simulation.html`)
+## Sheet model (`sheet/sheet.mjs`, `sheet/sheet-simulation.html`)
 
 `simulateSheet` runs the strip model for one cell and multiplies by the number of cells, N, under one of two source assumptions chosen by `sharing`:
 
 - **shared** — one source of the given nozzle diameter D and speed U is divided evenly among the cells: per-cell jet area A/N (diameter D/√N), same speed. Total jet power is conserved. Per-cell force scales as 1/N, per-cell power as 1/N², so total sheet power scales as 1/N. This is the honest case for "one pump, many crystals."
 - **independent** — every cell receives its own jet of diameter D at speed U. Total power and total jet input both scale linearly with N. This is an upper bound that assumes the upstream stage can supply N jets; nothing in this model checks that it can.
 
-Cells feed separate resistive loads and totals are sums of per-cell AC power. Cell size is set by `length` and `width` (mm); the sheet area is N × length × width. The strip model's screening checks apply per cell and suppress the charge estimate for the whole sheet when any fails. `sheetSweep` evaluates both modes over 1…N for the sweep chart. Verify with `node check-sheet.mjs`.
+Cells feed separate resistive loads and totals are sums of per-cell AC power. Cell size is set by `length` and `width` (mm); the sheet area is N × length × width. The strip model's screening checks apply per cell and suppress the charge estimate for the whole sheet when any fails. `sheetSweep` evaluates both modes over 1…N for the sweep chart. Verify with `node sheet/check-sheet.mjs`.
 
-## Full-product model (`full-model.mjs`, `product-simulation.html`)
+## Full-product model (`product/full-model.mjs`, `product/product-simulation.html`)
 
-`simulateSystem` couples a heaving float, a vertical water column in a tube beneath it, a nozzle jet, and the strip model as the leaf. Regular waves of height H and period T force the float through a coupling factor on the hydrostatic stiffness; the column oscillates in the tube and is pushed through the nozzle with ideal one-way routing; the jet's dynamic pressure loads the leaf tip. The equations are integrated with RK4 from rest, and the reported values are from the last three of 23 wave cycles once the response repeats. Energy is accounted end to end (`check-full.mjs` verifies the identity and step convergence). The water column's natural period 2π√(L/g) is reported next to the wave period because the jet is strongest near that resonance.
+`simulateSystem` couples a heaving float, a vertical water column in a tube beneath it, a nozzle jet, and the strip model as the leaf. Regular waves of height H and period T force the float through a coupling factor on the hydrostatic stiffness; the column oscillates in the tube and is pushed through the nozzle with ideal one-way routing; the jet's dynamic pressure loads the leaf tip. The equations are integrated with RK4 from rest, and the reported values are from the last three of 23 wave cycles once the response repeats. Energy is accounted end to end (`product/check-full.mjs` verifies the identity and step convergence). The water column's natural period 2π√(L/g) is reported next to the wave period because the jet is strongest near that resonance.
 
 Everything not modeled for the strip is also not modeled here, plus: mooring, irregular seas, nozzle losses beyond the ideal one-way routing, float pitch and roll, pump valves, and survival loads. Treat the output as a bound on what this architecture can deliver to a leaf, not as a design.
 
 Build both browser pages from the sources with `node build.mjs`; run all sweeps and regenerate `RESULTS.md` with `node run.mjs`.
 
-## Proposed node model (`node-model.mjs`, `node-simulation.html`)
+## Proposed node model (`node/node-model.mjs`, `node/node-simulation.html`)
 
 The third simulation replaces the piezo harvester with the architecture proposed for the product: a sealed horizontal cylinder with a heavy physical pendulum on a transverse shaft, a generator resisting the pendulum–hull relative rotation, a node battery, and a fixed-rate inductive dock that charges an AUV.
 
-Equations (SI): hull pitch θ obeys I_h θ̈ + c_h θ̇ + K_h θ = M_w cos ωt + τ, with K_h = ρ g B L³/12 (waterplane stiffness), I_h from the hull mass with 25% added inertia, c_h from a damping ratio, and M_w the Froude–Krylov pitch moment of a regular wave on the waterplane. The pendulum (absolute angle ψ, inertia I_p = m r_g², COG offset l) obeys I_p ψ̈ = −m g l sin ψ − K_s ψ + base − τ − stop, where base = −m l (a_z sin ψ + a_x cos ψ) is the pseudo-force torque from the hull following the wave orbit (surge/heave amplitudes scaled by a length-averaging RAO sin(kL/2)/(kL/2)), K_s is a torsion spring chosen so the pendulum's natural period equals the wave period (negative when the gravity period is shorter; `springTuning` = 0 disables it), and stop is a stiff spring–damper beyond `stopAngle`. The shaft torque τ = (c_gen + c_friction)(ψ̇ − θ̇); electrical power = c_gen (ψ̇ − θ̇)² × drive efficiency. With `generatorDamping` = 0 the model searches c_gen for maximum mean power. Energy is accounted end to end (wave work + base work = losses + generator + stored) and verified by `check-node.mjs`; end-stop contact loosens the balance to ~1%.
+Equations (SI): hull pitch θ obeys I_h θ̈ + c_h θ̇ + K_h θ = M_w cos ωt + τ, with K_h = ρ g B L³/12 (waterplane stiffness), I_h from the hull mass with 25% added inertia, c_h from a damping ratio, and M_w the Froude–Krylov pitch moment of a regular wave on the waterplane. The pendulum (absolute angle ψ, inertia I_p = m r_g², COG offset l) obeys I_p ψ̈ = −m g l sin ψ − K_s ψ + base − τ − stop, where base = −m l (a_z sin ψ + a_x cos ψ) is the pseudo-force torque from the hull following the wave orbit (surge/heave amplitudes scaled by a length-averaging RAO sin(kL/2)/(kL/2)), K_s is a torsion spring chosen so the pendulum's natural period equals the wave period (negative when the gravity period is shorter; `springTuning` = 0 disables it), and stop is a stiff spring–damper beyond `stopAngle`. The shaft torque τ = (c_gen + c_friction)(ψ̇ − θ̇); electrical power = c_gen (ψ̇ − θ̇)² × drive efficiency. With `generatorDamping` = 0 the model searches c_gen for maximum mean power. Energy is accounted end to end (wave work + base work = losses + generator + stored) and verified by `node/check-node.mjs`; end-stop contact loosens the balance to ~1%.
 
 Screens: pendulum hits the end-stops; hull pitch > 20°; capture width above the single-mode absorption limit λ/2π or above 2× hull length; non-repeating response. Charging is an energy budget: daily energy = electrical × 24 h × `availability` (fraction of time at this sea state, not a wave climate); the AUV session draws `dockPowerW` from the node battery for (pack × (1 − arrival SOC)) ÷ (dock power × dock efficiency) hours, and a 24 h state-of-charge timeline reports minimum, shortfall and recovery.
 
 Not modeled: irregular seas and directional spread, mooring and station keeping, hull surge/heave dynamics beyond wave-following, generator torque and thermal limits, power electronics, storm submergence, biofouling, battery ageing, docking reliability. Defaults are sized so one small-survey AUV (4.5 kWh, arriving at 10%) is charged in 3 h at 1.5 kW and the waves refill the battery about twice a day in 1 m / 6 s seas; see RESULTS.md for the size-versus-sea-state sweep.
 
-## PVC pipe generator model (`tube-model.mjs`, `tube-simulation.html`)
+## PVC pipe generator model (`tube/tube-model.mjs`, `tube/tube-simulation.html`)
 
 `simulateTube` models the moving-magnet architecture: a sealed pipe that heaves with the wave, an axially
 magnetised magnet sliding in the bore, and one or more coils wound outside it.
@@ -171,7 +171,7 @@ add. Coil inductance is computed but the current is taken as quasi-static, K(x)�
 is milliseconds against a multi-second wave; a screen fires if that stops being true. Load power is the
 extraction times R_load/(R_coil + R_load) — coil copper loss is subtracted, not ignored. `loadResistance` = 0
 searches log-spaced for the load that maximises delivered power. Energy is accounted end to end (base work =
-friction + extraction + stored) and verified by `check-tube.mjs`.
+friction + extraction + stored) and verified by `tube/check-tube.mjs`.
 
 Screens: magnet closes within 5 mm of an end magnet; coil current density above 5 A/mm²; L/R not small against
 the motion; stroke running outside a single coil's flux region; response not repeating; and the suspension

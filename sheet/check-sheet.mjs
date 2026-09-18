@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {simulateSheet,sheetSweep,sheetDefaults} from './sheet.mjs';
-import {simulate} from './model.mjs';
+import {simulate} from '../strip/model.mjs';
 const near=(a,b,tol=1e-9)=>assert.ok(Math.abs(a-b)<=tol*Math.max(1e-12,Math.abs(a),Math.abs(b)),`${a} != ${b}`);
 const one=simulateSheet({cells:1,sharing:'shared'}),strip=simulate();
 near(one.power,strip.power);near(one.jetPower,strip.jetPower); // one cell is the strip model

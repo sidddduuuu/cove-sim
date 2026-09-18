@@ -1,4 +1,4 @@
-import {simulate as stripModel} from './model.mjs';
+import {simulate as stripModel} from '../strip/model.mjs';
 
 export const systemDefaults=Object.freeze({height:0.1,period:3,tubeLength:2,tubeDiameter:35,
   nozzle:15,floatDiameter:0.6,hullMass:40,hullDamping:0.15,waterDamping:0.2,
