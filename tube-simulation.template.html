@@ -1,0 +1,191 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PVC pipe linear generator: magnet, coils, waves</title><style>
+:root {color-scheme:light dark;--background:light-dark(#fff,#16191b);--foreground:light-dark(#202a30,#e1e9ee);--border:light-dark(#bdc7cd,#52616a);--muted-foreground:light-dark(#53636f,#a7b8c3);--popover:var(--background);--popover-foreground:var(--foreground);--destructive:light-dark(#a62920,#ff9e96);--viz-series-1:light-dark(#006b9f,#6bc8f5);--viz-series-2:light-dark(#99400a,#fdb87d);--viz-series-3:light-dark(#2e7d4f,#7fd6a0);--water:light-dark(#d7ecf5,#22343f);--band:light-dark(#fff1d6,#3a2f14);}
+body {max-width:960px;margin:24px auto;padding:0 20px;background:var(--background);color:var(--foreground);font:16px/1.5 system-ui,sans-serif}
+h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .text-small {font-size:0.875rem} .btn {font:inherit;padding:6px 14px;border:1px solid var(--border);border-radius:5px;background:var(--background);color:var(--foreground)} a {color:var(--viz-series-1)} footer {margin:24px 0;color:var(--muted-foreground)}
+</style></head><body><div id="tube-generator">
+  <style>
+    #tube-generator {color:var(--foreground);font-family:system-ui,sans-serif;position:relative}
+    #tube-generator * {box-sizing:border-box}
+    #tube-generator .controls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;margin:16px 0}
+    #tube-generator label {display:block;min-width:0}
+    #tube-generator input[type=range] {width:100%;accent-color:var(--viz-series-1)}
+    #tube-generator input[type=number] {width:100%;min-height:38px;color:var(--foreground);background:var(--background);border:1px solid var(--border);padding:6px}
+    #tube-generator output {font-variant-numeric:tabular-nums}
+    #tube-generator .row {display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    #tube-generator .metrics {display:flex;gap:14px 30px;flex-wrap:wrap;margin:12px 0}
+    #tube-generator .metrics span {display:block}
+    #tube-generator button {cursor:pointer;min-height:36px}
+    #tube-generator .scene {display:block;width:100%;height:320px}
+    #tube-generator svg text {fill:var(--foreground);font-size:12px;font-weight:400}
+    #tube-generator .charts {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    #tube-generator .chart {width:100%;height:180px;display:block}
+    #tube-generator .wide {grid-column:1/-1;height:220px}
+    #tube-generator .tip {position:absolute;pointer-events:none;padding:8px;background:var(--popover);color:var(--popover-foreground);border:1px solid var(--border);z-index:2}
+    #tube-generator .error {color:var(--destructive)}
+    #tube-generator .phase {flex:1;min-width:150px}
+    #tube-generator summary {cursor:pointer;padding:8px 0}
+    #tube-generator .readout {min-height:2.5em;font-variant-numeric:tabular-nums}
+    #tube-generator .busy {opacity:.6}
+    #tube-generator .verdict {padding:10px 14px;border:1px solid var(--border);border-left:4px solid var(--viz-series-3);margin:12px 0}
+    #tube-generator .verdict.short {border-left-color:var(--destructive)}
+    @media(max-width:480px) {#tube-generator .charts {grid-template-columns:1fr} #tube-generator .controls {gap:12px}}
+  </style>
+  <h2>PVC pipe: magnet sliding through coils</h2>
+  <div class="text-small">Coupled screening model · regular waves · pipe heaves with the surface · magnet is a base-excited mass · load resistance auto-matched</div>
+  <div class="controls" id="primary-controls"></div>
+  <details>
+    <summary>Suspension, winding and electrical assumptions</summary>
+    <div class="text-small">A sealed pipe floats and follows the wave. Inside, an axially magnetised magnet slides in the bore; coils wound outside see its flux move and the induced current opposes the motion. Repelling end magnets are scaled to hold the magnet's own weight at the levitation gap: with no added spring they <em>are</em> the suspension, otherwise they are end bumpers and the magnet is preloaded to mid-travel. Coil inductance is neglected (L/R is milliseconds against a multi-second wave) and flagged when that fails. Load resistance 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
+    <div class="controls" id="advanced-controls"></div>
+  </details>
+  <div id="validation" role="alert" class="error"></div>
+  <svg class="scene" role="img" aria-label="A pipe heaves on a wave while a magnet inside slides past coils wound on the outside."></svg>
+  <div class="row">
+    <button id="play" type="button" class="btn">Play</button>
+    <label class="phase">Time <output id="phase-value">0 s</output><input id="phase" type="range" min="0" max="1000" value="0" aria-label="Time in the three-cycle window"></label>
+  </div>
+  <div class="readout text-small" id="instant"></div>
+  <div class="metrics" aria-live="polite" id="metrics"></div>
+  <div class="verdict" id="verdict"></div>
+  <div class="charts">
+    <svg class="chart" id="motion-plot" role="img" aria-label="Magnet displacement relative to the pipe"></svg>
+    <svg class="chart" id="emf-plot" role="img" aria-label="Induced electromotive force"></svg>
+    <svg class="chart wide" id="power-plot" role="img" aria-label="Power delivered to the load"></svg>
+  </div>
+  <div class="text-small" id="limits" aria-live="polite"></div>
+  <div class="text-small" id="notes" aria-live="polite"></div>
+  <div class="tip" role="tooltip" hidden></div>
+</div>
+<footer class="text-small">Source: <code>tube-model.mjs</code> (checked by <code>node check-tube.mjs</code>). Rebuild with <code>node build.mjs</code>; sweeps in <code>RESULTS.md</code> via <code>node run.mjs</code>.</footer>
+
+<script>
+// https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock
+/*__D3__*/
+</script>
+<script>
+/*__MODEL__*/
+
+(() => {
+  const root=document.getElementById('tube-generator'),$=s=>root.querySelector(s);
+  const primary=[['height','Wave height','m',0.1],['period','Wave period','s',0.5],
+    ['tubeLength','Pipe travel length','mm',50],['boreDiameter','Pipe bore','mm',5],
+    ['magnetDiameter','Magnet diameter','mm',5],['magnetLength','Magnet length','mm',5],
+    ['coils','Coils in series','',1],['coilTurns','Turns per coil','',50]];
+  const advanced=[['springGap','Levitation / bumper gap','mm',5],['springStiffness','Added spring (0 = magnets only)','N/m',0.1],
+    ['coilLength','Coil length','mm',5],['wireDiameter','Wire diameter','mm',0.05],['wallThickness','Pipe wall','mm',0.5],
+    ['fluxLinkage','Flux linkage factor','',0.05],['remanence','Magnet remanence','T',0.05],['density','Magnet density','kg/m³',100],
+    ['loadResistance','Load resistance (0 = auto)','Ω',1],['friction','Seal and bore friction','N·s/m',0.1],
+    ['heaveRao','Pipe heave response','',0.05],['availability','Fraction of time at this sea state','',0.05],
+    ['auvWh','AUV pack','Wh',100],['auvArrivalSoc','AUV arrival state of charge','',0.05]];
+  const settings={...tubeDefaults};
+  let model=simulateTube(settings),time=0,playing=false,last=0,frame,plotScales=[],timer;
+  const fmt=(v,d=2)=>Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
+  const watts=v=>{const a=Math.abs(v);return a<1e-6?fmt(v*1e9)+' nW':a<1e-3?fmt(v*1e6)+' µW':a<1?fmt(v*1e3)+' mW':a<1000?fmt(v,1)+' W':fmt(v/1000,2)+' kW';};
+  const years=h=>h===null?'—':fmt(h/8766,0)+' years';
+  const volts=v=>{const a=Math.abs(v);return a<1e-3?fmt(v*1e6,1)+' µV':a<1?fmt(v*1e3,2)+' mV':fmt(v,3)+' V';};
+  const wh=v=>Math.abs(v)<0.01&&v!==0?Number(v).toExponential(2)+' Wh':fmt(v,3)+' Wh';
+  function controls(items,target,type) {
+    for(const [key,label,unit,step] of items) {
+      const box=document.createElement('label'),out=document.createElement('output'),input=document.createElement('input');
+      box.append(label+' ',out);out.textContent=fmt(settings[key])+' '+unit;
+      Object.assign(input,{type,min:tubeBounds[key][0],max:tubeBounds[key][1],step,value:settings[key],id:'p-'+key});
+      input.addEventListener('input',()=>{settings[key]=input.value===''?NaN:Number(input.value);out.textContent=input.value+' '+unit;schedule();});
+      box.append(input);$(target).append(box);
+    }
+  }
+  controls(primary,'#primary-controls','range');controls(advanced,'#advanced-controls','number');
+  function scene() {
+    const svg=d3.select($('.scene')),w=$('.scene').clientWidth;
+    svg.attr('viewBox',`0 0 ${w} 320`).selectAll('*').remove();
+    svg.append('path').attr('class','sea').attr('fill','var(--water)');
+    svg.append('path').attr('class','surface').attr('fill','none').attr('stroke','var(--viz-series-1)').attr('stroke-width',2);
+    const g=svg.append('g').attr('class','pipe');
+    g.append('rect').attr('class','body').attr('fill','var(--background)').attr('stroke','var(--foreground)').attr('stroke-width',2);
+    g.append('g').attr('class','coils');
+    g.append('rect').attr('class','magnet').attr('fill','var(--viz-series-2)').attr('stroke','var(--foreground)');
+    svg.append('text').attr('x',12).attr('y',22).text('Pipe follows the wave · the magnet lags · coils see the flux move');
+    svg.append('text').attr('class','scale').attr('x',12).attr('y',310);
+  }
+  function chart(selector,series,label,xmax,xlabel,height) {
+    const node=$(selector),w=node.clientWidth,h=height||180,svg=d3.select(node),base=h-41;
+    svg.attr('viewBox',`0 0 ${w} ${h}`).selectAll('*').remove();
+    const vals=series.flatMap(s=>model.points.map(p=>p[s.key]*s.mult)),ext=d3.extent([...vals,0]),pad=(ext[1]-ext[0]||1)*0.12;
+    const x=d3.scaleLinear().domain([0,xmax]).range([67,w-18]),y=d3.scaleLinear().domain([ext[0]-pad,ext[1]+pad]).range([base,29]);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',base-29).attr('fill','none').attr('stroke','var(--border)');
+    svg.append('g').attr('transform',`translate(0,${base})`).call(d3.axisBottom(x).ticks(w<360?3:4));
+    svg.append('g').attr('transform','translate(67,0)').call(d3.axisLeft(y).ticks(3).tickFormat(d3.format('.2~g')));
+    svg.append('text').attr('x',0).attr('y',15).text(label);
+    svg.append('text').attr('x',w-18).attr('y',h-4).attr('text-anchor','end').text(xlabel);
+    for(const s of series)svg.append('path').datum(model.points).attr('fill','none').attr('stroke',s.color).attr('stroke-width',s.width||2).attr('stroke-dasharray',s.dash||null).attr('d',d3.line().x(d=>x(d.t)).y(d=>y(d[s.key]*s.mult)));
+    svg.append('line').attr('class','cursor').attr('y1',29).attr('y2',base).attr('stroke','var(--foreground)').attr('stroke-dasharray','3 3');
+    const marker=svg.append('circle').attr('r',3).attr('fill',series[0].color);
+    svg.append('rect').attr('x',67).attr('y',29).attr('width',w-85).attr('height',base-29).attr('fill','transparent').on('pointermove',event=>inspect(event,node,x)).on('pointerleave',()=>{$('.tip').hidden=true;});
+    plotScales.push({svg,x,y,key:series[0].key,mult:series[0].mult,marker});
+  }
+  function inspect(event,node,x) {
+    time=Math.max(0,Math.min(model.duration,x.invert(d3.pointer(event,node)[0])));stop();renderPhase();
+    const pt=tubeAt(model,time),tip=$('.tip'),rect=root.getBoundingClientRect();
+    tip.hidden=false;tip.textContent=`${fmt(pt.t)} s · ${fmt(pt.x*1000,1)} mm · ${volts(pt.emf)} · ${watts(pt.power)}`;
+    tip.style.left=Math.max(0,Math.min(root.clientWidth-tip.offsetWidth,event.clientX-rect.left+8))+'px';tip.style.top=event.clientY-rect.top-42+'px';
+  }
+  function renderPhase() {
+    const pt=tubeAt(model,time),w=$('.scene').clientWidth,cx=w/2,a=model.a,p=a.p,mean=180;
+    const pipeM=p.tubeLength/1000,pxm=Math.min(140,200/Math.max(pipeM+p.height,0.2));
+    // A 50 mm bore beside a 1 m pipe is a few pixels wide, and the relative stroke is often sub-millimetre.
+    // Both are exaggerated so the mechanism reads, and the factors are stated under the drawing.
+    const bore=pxm*p.boreDiameter/1000,wide=Math.max(1,18/Math.max(bore,1e-6));
+    const gain=Math.max(1,Math.min(500,0.10*pipeM/Math.max(model.stroke/2,1e-9)));
+    const surface=d3.range(0,w+1,6).map(px=>[px,mean-pxm*p.height/2*Math.cos(a.k*(px-cx)/pxm-a.w*pt.t)]);
+    d3.select($('.surface')).attr('d',d3.line().curve(d3.curveBasis)(surface));
+    d3.select($('.sea')).attr('d',d3.line().curve(d3.curveBasis)(surface)+`L${w},320 L0,320 Z`);
+    d3.select($('.pipe')).attr('transform',`translate(${cx},${mean-pxm*pt.wave})`);
+    const bw=bore*wide,wall=pxm*p.wallThickness/1000*wide;
+    d3.select($('.body')).attr('x',-bw/2).attr('y',-pxm*pipeM/2).attr('width',bw).attr('height',pxm*pipeM).attr('rx',3);
+    d3.select($('.coils')).selectAll('rect').data(a.offsets).join('rect')
+      .attr('x',-bw/2-wall).attr('y',d=>-pxm*d.o-Math.max(2,pxm*p.coilLength/2000)).attr('width',bw+2*wall)
+      .attr('height',d=>Math.max(4,pxm*p.coilLength/1000)).attr('fill','none').attr('stroke','var(--viz-series-1)').attr('stroke-width',3);
+    const pos=a.xeq+pt.x*gain;                                   // magnet position in the pipe, exaggerated
+    d3.select($('.magnet')).attr('x',-bw*p.magnetDiameter/p.boreDiameter/2).attr('y',-pxm*pos-pxm*p.magnetLength/2000)
+      .attr('width',bw*p.magnetDiameter/p.boreDiameter).attr('height',Math.max(3,pxm*p.magnetLength/1000)).attr('rx',2);
+    $('.scale').textContent=`${fmt(pxm,0)} px/m vertical · bore and coils drawn ×${fmt(wide,0)} wider · magnet travel ×${fmt(gain,0)} · stroke ${fmt(model.stroke*1000,2)} mm`;
+    $('#phase').value=Math.round(time/model.duration*1000);$('#phase-value').textContent=fmt(pt.t)+' s';
+    $('#instant').textContent=`wave ${fmt(pt.wave,2)} m · magnet ${fmt(pt.x*1000,2)} mm from rest · ${fmt(pt.v*1000,1)} mm/s · ${volts(pt.emf)} · ${fmt(pt.current*1e6,1)} µA · ${watts(pt.power)}`;
+    for(const v of plotScales){v.svg.select('.cursor').attr('x1',v.x(pt.t)).attr('x2',v.x(pt.t));v.marker.attr('cx',v.x(pt.t)).attr('cy',v.y(pt[v.key]*v.mult));}
+  }
+  function metrics() {
+    $('#metrics').replaceChildren();
+    const a=model.a,p=a.p,rows=[['Average load power',watts(model.loadPower)],
+      ['Extracted (load + copper)',watts(model.extracted)+' · '+fmt(100*model.loadPower/Math.max(model.extracted,1e-30),0)+'% reaches the load'],
+      ['Load / coil resistance',fmt(model.RL,1)+' Ω'+(model.searched?' (auto)':'')+' / '+fmt(a.Rcoil,1)+' Ω'],
+      ['Magnet mass',fmt(a.m,2)+' kg'],['Stroke (peak to peak)',fmt(model.stroke*1000,2)+' mm'],
+      ['Peak EMF',volts(model.peakEmf)],
+      ['Natural period',fmt(model.naturalPeriod,2)+' s vs '+fmt(p.period,1)+' s wave (×'+fmt(model.tuningRatio,1)+')'],
+      ['Energy per day at this sea state',watts(model.dailyWh/24)+' average → '+wh(model.dailyWh)]];
+    for(const [label,value] of rows){const box=document.createElement('div'),name=document.createElement('span'),v=document.createElement('strong');name.className='text-small';name.textContent=label;v.textContent=value;box.append(name,v);$('#metrics').append(box);}
+    const sag=9.81/(a.w*a.w),ok=model.chargesPerDay>=1&&!model.issues.length;
+    $('#verdict').className='verdict'+(ok?'':' short');
+    $('#verdict').textContent=`Charging a ${fmt(p.auvWh/1000,2)} kWh AUV from ${fmt(p.auvArrivalSoc*100,0)}% needs ${fmt(model.auvNeedWh/1000,2)} kWh: this pipe delivers ${fmt(model.chargesPerDay,4)} charges per day, or ${years(model.hours)} per kWh. To resonate at ${fmt(p.period,1)} s the suspension needs ${fmt(a.tunedStiffness,2)} N/m, and any vertical spring that soft sags at least ${fmt(sag,1)} m under this magnet — against ${fmt(a.h,2)} m of available travel.`;
+    $('#limits').textContent=model.issues.length?model.issues.join(' '):`Within screening limits · ${model.steps.toLocaleString()} solver steps · energy residual ${(model.residual/Math.max(Math.abs(model.inputWork),1e-30)).toExponential(1)} of base work`;
+    $('#limits').classList.toggle('error',!!model.issues.length);
+    $('#notes').textContent='Regular waves only; availability scales a single sea state, it is not a wave climate. Not modeled: irregular seas, mooring, eddy-current and hysteresis loss, magnet tilt and rubbing in the bore, rectification and storage electronics, demagnetisation, seawater ingress, biofouling, fatigue of the end magnets.';
+  }
+  function redraw(){scene();plotScales=[];
+    chart('#motion-plot',[{key:'x',mult:1000,color:'var(--viz-series-2)'}],'Magnet displacement relative to the pipe (mm)',model.duration,'Time (s)');
+    chart('#emf-plot',[{key:'emf',mult:1,color:'var(--viz-series-1)'}],'Induced EMF (V)',model.duration,'Time (s)');
+    chart('#power-plot',[{key:'power',mult:1,color:'var(--viz-series-3)'}],'Load power (W)',model.duration,'Time (s)',220);
+    renderPhase();}
+  function schedule(){clearTimeout(timer);root.classList.add('busy');timer=setTimeout(update,200);}
+  function update() {
+    try {model=simulateTube(settings);time=Math.min(time,model.duration);$('#validation').textContent='';$('#play').disabled=false;$('#phase').disabled=false;$('.scene').style.opacity='1';metrics();redraw();}
+    catch(error) {stop();$('#validation').textContent=error.message+' Display retains the last valid inputs.';$('#play').disabled=true;$('#phase').disabled=true;$('.scene').style.opacity='0.35';}
+    root.classList.remove('busy');
+  }
+  function stop(){playing=false;cancelAnimationFrame(frame);$('#play').textContent='Play';}
+  function tick(now){if(!playing)return;time=(time+Math.min((now-last)/1000,0.1))%model.duration;last=now;renderPhase();frame=requestAnimationFrame(tick);}
+  $('#play').addEventListener('click',()=>{if(playing){stop();return;}playing=true;last=performance.now();$('#play').textContent='Pause';frame=requestAnimationFrame(tick);});
+  $('#phase').addEventListener('input',event=>{stop();time=Number(event.target.value)/1000*model.duration;renderPhase();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+  new ResizeObserver(redraw).observe(root);
+  update();
+})();
+</script></body></html>

@@ -147,3 +147,42 @@ Equations (SI): hull pitch θ obeys I_h θ̈ + c_h θ̇ + K_h θ = M_w cos ωt +
 Screens: pendulum hits the end-stops; hull pitch > 20°; capture width above the single-mode absorption limit λ/2π or above 2× hull length; non-repeating response. Charging is an energy budget: daily energy = electrical × 24 h × `availability` (fraction of time at this sea state, not a wave climate); the AUV session draws `dockPowerW` from the node battery for (pack × (1 − arrival SOC)) ÷ (dock power × dock efficiency) hours, and a 24 h state-of-charge timeline reports minimum, shortfall and recovery.
 
 Not modeled: irregular seas and directional spread, mooring and station keeping, hull surge/heave dynamics beyond wave-following, generator torque and thermal limits, power electronics, storm submergence, biofouling, battery ageing, docking reliability. Defaults are sized so one small-survey AUV (4.5 kWh, arriving at 10%) is charged in 3 h at 1.5 kW and the waves refill the battery about twice a day in 1 m / 6 s seas; see RESULTS.md for the size-versus-sea-state sweep.
+
+## PVC pipe generator model (`tube-model.mjs`, `tube-simulation.html`)
+
+`simulateTube` models the moving-magnet architecture: a sealed pipe that heaves with the wave, an axially
+magnetised magnet sliding in the bore, and one or more coils wound outside it.
+
+Equations (SI). The pipe follows the surface, z(t) = (H/2)·`heaveRao`·cos ωt, so in the pipe frame the magnet
+of mass m (from magnet volume × density) sees a pseudo-force m·a·ω²·cos ωt at displacement x from mid-travel:
+
+    m ẍ = m a ω² cos ωt + P − m g + F_mag(x) − k_spring (x − x_eq) − c ẋ − K(x)² ẋ / (R_coil + R_load)
+
+The end magnets repel as F = C/gap⁴ (coaxial dipole far field) from each end, with C fixed by requiring that
+repulsion to hold the magnet's own weight at the gap `springGap` — so the suspension is not a free parameter.
+With no added spring they *are* the suspension and the magnet levitates at x_eq = `springGap` − half-travel;
+with a spring the magnet is preloaded to mid-travel (P = m g, gravity cancels) and the end magnets are bumpers.
+
+Flux linkage of one coil against magnet offset u is taken as λ_pk·exp(−u²/2σ²) with σ = √(l_magnet² + l_coil²)/2
+and λ_pk = turns × `fluxLinkage` × remanence × magnet area, so the transduction K = dλ/dx is **odd and zero with
+the magnet centred in the coil**, peaking one σ away. That is why a single-coil generator produces its EMF at
+twice the wave frequency and nothing at maximum speed. Coils are spaced 2σ apart and wound alternately so they
+add. Coil inductance is computed but the current is taken as quasi-static, K(x)ẋ/(R_coil + R_load), because L/R
+is milliseconds against a multi-second wave; a screen fires if that stops being true. Load power is the
+extraction times R_load/(R_coil + R_load) — coil copper loss is subtracted, not ignored. `loadResistance` = 0
+searches log-spaced for the load that maximises delivered power. Energy is accounted end to end (base work =
+friction + extraction + stored) and verified by `check-tube.mjs`.
+
+Screens: magnet closes within 5 mm of an end magnet; coil current density above 5 A/mm²; L/R not small against
+the motion; stroke running outside a single coil's flux region; response not repeating; and the suspension
+screen — a vertical spring soft enough to resonate at the wave period sags m·g/k = g/ω² under the magnet's own
+weight, 8.95 m at 6 s **whatever the magnet weighs**, which is checked against the travel the pipe actually has.
+That last one is the result: it is a geometric statement, not a tuning difficulty, and it is the same length as a
+pendulum of that period — which is why the pendulum node reaches wave frequency inside a 12 m hull while a
+straight pipe cannot.
+
+Not modeled: irregular seas and directional spread, mooring, eddy-current and hysteresis loss in any steel,
+magnet tilt and rubbing in the bore (Coulomb friction is folded into one viscous coefficient), rectification and
+storage electronics, demagnetisation, seawater ingress, biofouling, end-magnet fatigue, and the buoyancy and
+stability of the pipe itself. The Gaussian flux-linkage shape is a screening convenience fitted to no particular
+magnet; replace it with a measured λ(x) before trusting any absolute number.

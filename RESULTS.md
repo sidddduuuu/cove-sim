@@ -1,6 +1,6 @@
 # Simulation results
 
-Generated 2026-09-13 by `node run.mjs`. Screening-model outputs, not measurements. Defaults from MODEL.md unless a column says otherwise.
+Generated 2026-09-18 by `node run.mjs`. Screening-model outputs, not measurements. Defaults from MODEL.md unless a column says otherwise.
 
 ## 1. Full product (float → water column → jet → leaf)
 
@@ -91,8 +91,61 @@ Defaults: hull 12 m × Ø2.8 m, pendulum 10000 kg on a 1.1 m arm, spring-tuned t
 | 4.5 m / 0.4 t (earlier design doc), H 1 m T 6 s | 5 | 0.000 | 28 | 0.04 | 3.0 | 0.01 | ok |
 | default, gravity pendulum only (no spring) | 136 | 0.004 | 5 | 1.14 | 3.0 | 0.25 | ok |
 
+## 5. PVC pipe linear generator (magnet sliding through coils)
+
+Defaults: 1000 mm travel in a 50 mm bore, 40×50 mm NdFeB magnet (0.47 kg), 1×1000 turns of 0.5 mm wire, load auto-matched. "Levitation" = no spring: the end magnets hold the magnet up and set the stiffness.
+
+| H (m) | T (s) | load power | natural period s | stroke mm | peak EMF | years per 1 kWh |
+|---|---|---|---|---|---|---|
+| 0.5 | 4 | 2.45 nW | 0.25 | 1.97 | 590 µV | 46,527,109 |
+| 0.5 | 6 | 0.04 nW | 0.25 | 0.85 | 74 µV | 2,743,814,789 |
+| 0.5 | 8 | 2.3e-12 W | 0.25 | 0.48 | 17 µV | 48,980,697,307 |
+| 1 | 4 | 41.32 nW | 0.25 | 4.12 | 3 mV | 2,760,817 |
+| 1 | 6 | 0.67 nW | 0.25 | 1.74 | 306 µV | 169,757,168 |
+| 1 | 8 | 0.04 nW | 0.25 | 0.96 | 70 µV | 3,051,526,419 |
+| 2 | 4 | 810.66 nW | 0.25 | 9.07 | 13 mV | 140,722 |
+| 2 | 6 | 11.20 nW | 0.25 | 3.62 | 1 mV | 10,189,643 |
+| 2 | 8 | 0.61 nW | 0.25 | 1.97 | 293 µV | 188,301,503 |
+
+### Suspension stiffness (H 1 m, T 6 s)
+
+The end magnets must hold the magnet up, so with no spring the suspension is stiff and the magnet rides with the pipe. Softening it toward the 6 s wave means a spring that sags at least g/ω² = 8.95 m under any mass.
+
+| suspension | spring N/m | load power | natural period s | stroke mm | peak EMF | static sag m | screen |
+|---|---|---|---|---|---|---|---|
+| levitation (magnets only) | — | 0.67 nW | 0.25 | 1.74 | 306 µV | 0.00 | ok |
+| 500 N/m | 500.00 | 0.10 nW | 0.19 | 1.03 | 108 µV | 0.01 | ok |
+| 50 N/m | 50.00 | 972.90 nW | 0.61 | 10.43 | 11 mV | 0.09 | ok |
+| 5 N/m | 5.00 | 1.94 mW | 1.93 | 91.63 | 907 mV | 0.92 | suppressed: A vertical spring this soft sags 0.9 m under |
+| tuned to the wave | 0.50 | 11.41 mW | 6.00 | 611.28 | 4.1 V | 9.30 | suppressed: A vertical spring this soft sags 9.3 m under |
+
+### Scaling the pipe (tuned suspension, H 1 m, T 6 s)
+
+The best case this architecture can reach, ignoring that the tuned suspension above is not buildable vertically.
+
+| pipe | magnet kg | load power | natural period s | stroke mm | peak EMF |
+|---|---|---|---|---|---|
+| 50 mm bore, 1 m, 1 coil | 0.5 | 11.41 mW | 6.00 | 611.28 | 4.1 V |
+| 50 mm bore, 1 m, 10 coils | 0.5 | 13.40 mW | 6.00 | 560.32 | 6.9 V |
+| 110 mm bore, 2 m, 10 coils | 8.8 | 1.08 W | 6.00 | 1214.84 | 68.3 V |
+| 160 mm bore, 4 m, 20 coils | 39.8 | 7.43 W | 6.00 | 2087.46 | 208.3 V |
+
+### The tuning wall
+
+A vertical spring-mass tuned to a wave period sags g/ω² under its own weight, whatever the mass. That is the same length as a pendulum of the same period — which is why the pendulum node reaches wave frequency in a 12 m hull and a straight pipe cannot.
+
+| wave period s | required stiffness / mass 1/s² | static sag m |
+|---|---|---|
+| 4 | 2.467 | 3.98 |
+| 6 | 1.097 | 8.95 |
+| 8 | 0.617 | 15.90 |
+| 10 | 0.395 | 24.85 |
+| 12 | 0.274 | 35.78 |
+
 ## Reading these numbers
 
 Every configuration here lands in the microwatt range while the prescribed jets carry tens of milliwatts to watts; conversion is 10⁻⁴ to 10⁻² percent because a 0.17–0.5 Hz pulse bends a 6 Hz strip quasi-statically. Adding cells on a shared source reduces total power (per-cell force ∝ 1/N, power ∝ 1/N², N cells → 1/N). Independent jets scale linearly but the total jet input must come from the wave-to-water stage, which the full-product model shows delivers under a watt of jet power at a 0.1 m wave. Charging a 1 kWh vehicle is 10⁴–10⁶ years in every case.
 
 The pendulum node closes the gap because it puts tonnes, not grams, in motion at wave frequency and takes the energy out with a generator at ~80% instead of a piezo at 0.01%. The size needed is set by the physics of an inertial absorber (power scales with pendulum mass × wave height² ÷ period³): roughly a 10–12 m hull with a 6–10 t spring-tuned pendulum gives one small-survey charge per day in 1 m / 6 s seas; an 8 m hull with 3 t does it at a short-period 1.5 m site. The 4.5 m / 400 kg unit in the earlier design document makes single-digit watts in the same seas and is a sensor-power node, not an AUV charger. The charge session itself (3 h at 1.5 kW) always comes from the node battery; the waves decide how many sessions per day the battery can be refilled for.
+
+The PVC pipe generator removes the piezo conversion penalty — a coil and a magnet are an efficient transducer — and still lands in the nanowatt range as built, for a different reason: the suspension. Repelling end magnets strong enough to hold the magnet up are stiff (0.25 s natural period against a 6 s wave), so the magnet rides with the pipe instead of lagging it, and the relative stroke is under 2 mm. Softening the suspension to wave frequency is not a tuning choice but a geometry problem: a vertical spring-mass at 6 s sags 8.95 m under its own weight regardless of mass, more travel than the pipe has. Even granting the impossible spring, a 4 m pipe with a 40 kg magnet and 20 coils reaches single-digit watts. A pendulum escapes this because its restoring torque comes from gravity itself and a torsion spring adds stiffness without having to carry the weight, which is why the same 8.95 m appears as a hull dimension rather than a spring deflection.
