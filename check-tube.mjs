@@ -42,6 +42,14 @@ assert.ok(simulateTube({coils:8}).loadPower<simulateTube({coils:8}).extracted,'C
 assert.ok(simulateTube({springStiffness:0.5,tubeLength:2500,springGap:150,coils:1}).issues.some(s=>s.includes('coil')),'Stroke outside the coil is flagged');
 assert.ok(Math.abs(tubeAt(m,m.duration*2).energy-2*m.extracted*m.duration)<1e-9,'Cumulative energy across loops');
 
+// Regression: a settle boundary landing a hair below `start` used to pin the sampling target there, so the
+// integrator looped forever appending points without advancing time. This geometry reproduced it.
+const hang=simulateTube({tilt:90,frictionCoefficient:0.01,height:2,period:8,boreDiameter:600,magnetDiameter:480,
+  magnetLength:600,tubeLength:12000,springGap:720,coilLength:360,coilTurns:1500,wireDiameter:5,wallThickness:36,
+  coils:16,springStiffness:499.4,loadResistance:0.1});
+assert.ok(hang.points.length<2000&&Number.isFinite(hang.loadPower),'Integrator terminates at the settle boundary');
+assert.ok(tubeParameters({coils:16}).Kpeak>0,'Peak coupling is found for an even number of coils');
+
 assert.throws(()=>simulateTube({period:0}),RangeError);
 assert.throws(()=>simulateTube({magnetDiameter:60}),RangeError,'Magnet must clear the bore');
 assert.throws(()=>simulateTube({springGap:4000}),RangeError,'Levitation gap must fit the travel');

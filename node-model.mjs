@@ -65,8 +65,8 @@ function integrate(a,cg,stepScale=1) {
   const dt=Math.min(T/200,0.5*Math.min(a.pendulumPeriod,a.hullPeriod)/20,0.4/Math.max(rate,1e-9))*stepScale;
   let y=Array(7).fill(0),t=0,next=start,first,points=[],steps=0;
   while(t<end-1e-10) {
-    const target=t<start?start:Math.min(next,end);
-    if(target-t<1e-10){if(!first)first=[...y];points.push(point(t,y,a,cg));next=Math.min(end,next+T/100);if(t>=end-1e-10)break;continue;}
+    const target=t<start-1e-10?start:Math.min(next,end);
+    if(target-t<1e-10){t=target;if(!first)first=[...y];points.push(point(t,y,a,cg));next=Math.min(end,next+T/100);if(t>=end-1e-10)break;continue;}
     const h=Math.min(dt,target-t);y=rk4(t,y,h,a,cg);t+=h;
     if(++steps>4e6||y.some(v=>!Number.isFinite(v)))throw new Error('Solver could not resolve this setting.');
   }

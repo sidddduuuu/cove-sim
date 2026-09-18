@@ -35,7 +35,7 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
   <div class="controls" id="primary-controls"></div>
   <details>
     <summary>Suspension, winding and electrical assumptions</summary>
-    <div class="text-small">A sealed pipe floats and follows the wave. Inside, an axially magnetised magnet slides in the bore; coils wound outside see its flux move and the induced current opposes the motion. Repelling end magnets are scaled to hold the magnet's own weight at the levitation gap: with no added spring they <em>are</em> the suspension, otherwise they are end bumpers and the magnet is preloaded to mid-travel. Coil inductance is neglected (L/R is milliseconds against a multi-second wave) and flagged when that fails. Load resistance 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
+    <div class="text-small">A sealed pipe floats and follows the wave. Tilt trades one limit for another: upright, the suspension must hold the magnet up and a spring soft enough to resonate sags g·cos(tilt)/ω² (8.95 m at 6 s, whatever the magnet weighs); flat, the sag vanishes but the magnet rests on the bore and only moves if the friction coefficient stays under a·ω²/g — a ratio no bigger magnet can improve. Inside, an axially magnetised magnet slides in the bore; coils wound outside see its flux move and the induced current opposes the motion. Repelling end magnets are scaled to hold the magnet's own weight at the levitation gap: with no added spring they <em>are</em> the suspension, otherwise they are end bumpers and the magnet is preloaded to mid-travel. Coil inductance is neglected (L/R is milliseconds against a multi-second wave) and flagged when that fails. Load resistance 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
     <div class="controls" id="advanced-controls"></div>
   </details>
   <div id="validation" role="alert" class="error"></div>
@@ -71,13 +71,16 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
 // levitates on the lower end magnet and the spring is whatever that repulsion provides.
 const tubeDefaults=Object.freeze({height:1,period:6,heaveRao:1,
   boreDiameter:50,tubeLength:1000,magnetDiameter:40,magnetLength:50,remanence:1.3,density:7500,
-  springGap:60,springStiffness:0,coils:1,coilLength:30,coilTurns:1000,wireDiameter:0.5,wallThickness:3,fluxLinkage:0.4,
+  tilt:0,frictionCoefficient:0.15,springGap:60,springStiffness:0,coils:1,coilLength:30,coilTurns:1000,wireDiameter:0.5,wallThickness:3,fluxLinkage:0.4,
   loadResistance:0,friction:0.5,availability:0.35,auvWh:4500,auvArrivalSoc:0.1});
 const tubeBounds=Object.freeze({height:[0,6],period:[2,16],heaveRao:[0,1],
-  boreDiameter:[10,600],tubeLength:[100,20000],magnetDiameter:[5,590],magnetLength:[5,2000],remanence:[0.1,1.5],density:[1000,9000],
-  springGap:[1,5000],springStiffness:[0,1e6],coils:[1,200],coilLength:[2,2000],coilTurns:[1,100000],wireDiameter:[0.05,5],wallThickness:[0.5,50],fluxLinkage:[0.02,1],
+  boreDiameter:[10,2000],tubeLength:[100,60000],magnetDiameter:[5,1990],magnetLength:[5,10000],remanence:[0.1,1.5],density:[1000,9000],
+  tilt:[0,90],frictionCoefficient:[0,1],springGap:[1,5000],springStiffness:[0,1e6],coils:[1,200],coilLength:[2,2000],coilTurns:[1,100000],wireDiameter:[0.05,5],wallThickness:[0.5,50],fluxLinkage:[0.02,1],
   loadResistance:[0,1e6],friction:[0,1000],availability:[0,1],auvWh:[50,200000],auvArrivalSoc:[0,1]});
 const rhoCu=1.68e-8,mu0=4e-7*Math.PI,g=9.81;
+// ponytail: Coulomb friction is regularised as mu*N*tanh(v/STICTION) instead of a proper stick-slip solver.
+// Ceiling: motion below ~10 mm/s is smeared, so a design that barely breaks static friction reads optimistic.
+const STICTION=0.01;
 
 function tubeParameters(input={}) {
   const p=Object.freeze({...tubeDefaults,...input});
@@ -90,22 +93,22 @@ function tubeParameters(input={}) {
   const m=p.density*Math.PI*rm*rm*lm;                       // moving mass (the magnet alone; no carriage)
   const h=(p.tubeLength-p.magnetLength)/2000,d=p.springGap/1000; // h: half the free travel; d: static levitation gap
   if(d>=h)throw new RangeError(`Levitation gap (${p.springGap} mm) must be less than the half-travel (${(h*1000).toFixed(0)} mm).`);
-  // End magnets repel as C/gap⁴ (coaxial dipole far-field). C is set so the magnet floats at gap d against
-  // its own weight, counting the far end magnet's pull, so the spring is not a free parameter: it is whatever
-  // holds this mass up at this gap. Stiffness and natural period follow from that, which is the crux (MODEL.md).
-  // End magnets repel as C/gap⁴ (coaxial dipole far-field), scaled so that repulsion equals the magnet's own
-  // weight at the gap `springGap`. With no spring they ARE the suspension and the magnet levitates there;
-  // with a spring they are end bumpers. Either way their stiffness is not a free parameter.
+  // Tilt takes gravity off the axis: 0° is a vertical pipe, 90° a horizontal one. The magnet then rests on
+  // the bore instead of loading the spring, trading the suspension problem for sliding friction.
+  const tilt=p.tilt*Math.PI/180,gAxial=g*Math.cos(tilt),Fcoulomb=p.frictionCoefficient*m*g*Math.sin(tilt);
+  // End magnets repel as C/gap⁴ (coaxial dipole far-field), scaled to push back with the magnet's own weight
+  // at the gap `springGap`. Vertical and unsprung they ARE the suspension; otherwise they are end bumpers.
   const C=m*g*d**4/(1-(d/(2*h-d))**4);
-  // With a spring the magnet is preloaded to sit at mid-travel and gravity cancels out; without one it hangs
-  // where the lower end magnet holds it up. One choice, everything else follows.
-  const xeq=p.springStiffness>0?0:d-h,P=m*g-springForce(xeq,{C,h});
+  // Rest position: preloaded to mid-travel when a spring carries the magnet, otherwise wherever the end
+  // magnets balance the axial component of its weight (mid-travel when horizontal, near the lower end when not).
+  let xeq=0;
+  if(p.springStiffness===0&&gAxial>0){let lo=d-h,hi=0;for(let i=0;i<80;i++){const mid=(lo+hi)/2;springForce(mid,{C,h})>m*gAxial?lo=mid:hi=mid;}xeq=(lo+hi)/2;}
+  const P=m*gAxial-springForce(xeq,{C,h});
   const kMag=4*C/(h+xeq)**5+4*C/(h-xeq)**5,kMid=8*C/h**5,w=2*Math.PI/p.period;
   const kSusp=p.springStiffness+kMag;
-  // A vertical spring soft enough to resonate at wave periods must still hold the magnet up: its static sag
-  // is m·g/k = g/ω² at resonance — 8.9 m for a 6 s wave, regardless of mass. That is the screen below.
-  // Spring that must be ADDED to reach wave resonance, and the sag it then shows under the magnet's weight.
-  const tunedStiffness=Math.max(0,m*w*w-kMid),staticSag=p.springStiffness>0?m*g/p.springStiffness:0;
+  // A spring soft enough to resonate must still hold the magnet up: its sag is m·g_axial/k = g·cos(tilt)/ω²,
+  // 8.95 m for a vertical pipe at 6 s whatever the mass, and zero once the pipe lies flat.
+  const tunedStiffness=Math.max(0,m*w*w-kMid),staticSag=p.springStiffness>0?m*gAxial/p.springStiffness:0;
   const rCoil=(p.boreDiameter/2+p.wallThickness)/1000+p.wireDiameter/2000;
   const wireArea=Math.PI*(p.wireDiameter/2000)**2;
   const Rcoil=rhoCu*(p.coils*p.coilTurns*2*Math.PI*rCoil)/wireArea;
@@ -115,26 +118,32 @@ function tubeParameters(input={}) {
   // 2·sigma apart and wound alternately so their contributions add.
   const sigma=Math.sqrt(lm*lm+lc*lc)/2,lambda=p.coilTurns*p.fluxLinkage*p.remanence*Math.PI*rm*rm;
   const offsets=Array.from({length:p.coils},(_,i)=>({o:xeq+(i-(p.coils-1)/2)*2*sigma,s:i%2?-1:1}));
-  const amp=p.height/2*p.heaveRao,k=w*w/g;
-  return {p,m,h,d,C,P,xeq,kMag,kMid,kSusp,k,lambda:2*Math.PI/k,staticSag,tunedStiffness,w,amp,rm,lm,lc,rCoil,wireArea,Rcoil,Lcoil,sigma,lambda,offsets,
-    naturalPeriod:2*Math.PI*Math.sqrt(m/kSusp),Kpeak:coupling(xeq+sigma,{sigma,lambda,offsets})};
+  const k=w*w/g,span=p.tubeLength/1000*Math.sin(tilt);
+  // A pipe lying along the wave spans several phases; average the orbital forcing over its horizontal extent.
+  const rao=span>0?Math.sin(k*span/2)/(k*span/2):1,amp=p.height/2*p.heaveRao*rao;
+  return {p,m,h,d,C,P,xeq,kMag,kMid,kSusp,k,lambda:2*Math.PI/k,staticSag,tunedStiffness,w,amp,tilt,gAxial,Fcoulomb,rao,rm,lm,lc,rCoil,wireArea,Rcoil,Lcoil,sigma,lambda,offsets,
+    naturalPeriod:2*Math.PI*Math.sqrt(m/kSusp),Kpeak:peakCoupling({h,sigma,lambda,offsets})};
 }
 
 // Transduction K(x) in V·s/m (equivalently N/A): sum of every coil's dλ/dx at this magnet position.
+function peakCoupling(a){let K=0;for(let i=0;i<=400;i++)K=Math.max(K,Math.abs(coupling(-a.h+2*a.h*i/400,a)));return K;}
 function coupling(x,a){let K=0;for(const {o,s} of a.offsets){const u=(x-o)/a.sigma;K+=s*a.lambda*u/a.sigma*Math.exp(-u*u/2);}return K;}
 function springForce(x,a){return a.C/Math.max(a.h+x,1e-4)**4-a.C/Math.max(a.h-x,1e-4)**4;}
 
 // state: [x, xdot, Ebase_in, Efriction, Eextracted]
 function tubeRates(t,y,a,RL) {
-  const [x,xd]=y,{p,m,P,xeq,w,amp,Rcoil}=a;
+  const [x,xd]=y,{p,m,P,xeq,w,amp,Rcoil,gAxial,Fcoulomb}=a;
   const K=coupling(x,a),Fem=K*K*xd/(Rcoil+RL);           // Lenz force: current K·xd/R through coupling K
-  const base=m*amp*w*w*Math.cos(w*t);                     // pseudo-force from heaving the pipe
-  const acc=(base+P-m*g+springForce(x,a)-p.springStiffness*(x-xeq)-p.friction*xd-Fem)/m;
-  return [xd,acc,base*xd,p.friction*xd*xd,Fem*xd];
+  // The wave orbit is circular, so the pipe's axial forcing has the same amplitude at any tilt — only its
+  // phase changes. Tilt costs power through friction and gains it by freeing the spring, not through drive.
+  const base=m*amp*w*w*Math.cos(w*t);
+  const drag=p.friction*xd+Fcoulomb*Math.tanh(xd/STICTION);
+  const acc=(base+P-m*gAxial+springForce(x,a)-p.springStiffness*(x-xeq)-drag-Fem)/m;
+  return [xd,acc,base*xd,drag*xd,Fem*xd];
 }
 function tubeEnergy(y,a) {
-  const [x,xd]=y,{p,m,h,C,P,xeq}=a;
-  return m*xd*xd/2+(m*g-P)*x+C/3*(1/Math.max(h+x,1e-4)**3+1/Math.max(h-x,1e-4)**3)+p.springStiffness*(x-xeq)**2/2;
+  const [x,xd]=y,{p,m,h,C,P,xeq,gAxial}=a;
+  return m*xd*xd/2+(m*gAxial-P)*x+C/3*(1/Math.max(h+x,1e-4)**3+1/Math.max(h-x,1e-4)**3)+p.springStiffness*(x-xeq)**2/2;
 }
 function rk4(t,y,dt,a,RL) {
   const k1=tubeRates(t,y,a,RL),k2=tubeRates(t+dt/2,y.map((v,i)=>v+dt*k1[i]/2),a,RL);
@@ -144,12 +153,12 @@ function rk4(t,y,dt,a,RL) {
 
 function integrate(a,RL,stepScale=1) {
   const {p,m}=a,T=p.period,cycles=20,start=(cycles-3)*T,end=cycles*T;
-  const damp=(p.friction+a.Kpeak**2/(a.Rcoil+RL))/m;
+  const damp=(p.friction+a.Fcoulomb/STICTION+a.Kpeak**2/(a.Rcoil+RL))/m;
   const dt=Math.min(T/400,a.naturalPeriod/60,0.4/Math.max(damp,1e-9))*stepScale;
   let y=[a.xeq,0,0,0,0],t=0,next=start,first,points=[],steps=0;
   while(t<end-1e-10) {
-    const target=t<start?start:Math.min(next,end);
-    if(target-t<1e-10){if(!first)first=[...y];points.push(point(t,y,a,RL));next=Math.min(end,next+T/120);if(t>=end-1e-10)break;continue;}
+    const target=t<start-1e-10?start:Math.min(next,end);
+    if(target-t<1e-10){t=target;if(!first)first=[...y];points.push(point(t,y,a,RL));next=Math.min(end,next+T/120);if(t>=end-1e-10)break;continue;}
     y=rk4(t,y,Math.min(dt,target-t),a,RL);t+=Math.min(dt,target-t);
     if(++steps>4e6||y.some(v=>!Number.isFinite(v)))throw new Error('Solver could not resolve this setting.');
   }
@@ -174,6 +183,7 @@ function simulateTube(input={},stepScale=1) {
   }
   const r=integrate(a,RL,stepScale),Rtot=a.Rcoil+RL;
   const extracted=(r.last[4]-r.first[4])/r.duration;      // total electromagnetic power (coil + load)
+  const frictionLoss=(r.last[3]-r.first[3])/r.duration;
   const loadPower=extracted*RL/Rtot,copperLoss=extracted-loadPower;
   const inputWork=r.last[2]-r.first[2],residual=(r.last[2]-r.last[3]-r.last[4])-(tubeEnergy(r.last,a)-tubeEnergy([a.xeq,0],a));
   const max=key=>Math.max(...r.points.map(v=>Math.abs(v[key])));
@@ -181,8 +191,12 @@ function simulateTube(input={},stepScale=1) {
   const minGap=Math.min(...r.points.map(v=>Math.min(v.gap,2*a.h-v.gap)));
   const currentDensity=peakCurrent/(a.wireArea*1e6);        // A/mm²
   const coilSpan=2*a.sigma*p.coils,tau=a.Lcoil/Rtot;
+  // Sliding friction and wave forcing both scale with the magnet's mass, so their ratio mu·g·sin(tilt)/(a·w²)
+  // is a property of the sea state and the bearing alone: no magnet is heavy enough to break loose if it is >1.
+  const stiction=a.Fcoulomb/Math.max(a.m*a.amp*a.w*a.w,1e-30);
   const issues=[];
   if(a.staticSag>a.h)issues.push(`A vertical spring this soft sags ${a.staticSag.toFixed(1)} m under the magnet's own weight but the pipe offers ${a.h.toFixed(2)} m of travel: this suspension cannot be built vertically.`);
+  if(stiction>0.8)issues.push(`Sliding friction is ${stiction.toFixed(2)}× the wave forcing (mu·g·sin tilt / a·w²): the magnet barely breaks loose, and that ratio does not improve with a bigger magnet — lower the friction coefficient or tilt the pipe back up.`);
   if(minGap<0.005)issues.push(`Magnet closes to ${(minGap*1000).toFixed(1)} mm of an end magnet: contact and impact loads are not modeled.`);
   if(currentDensity>5)issues.push(`Coil current density ${currentDensity.toFixed(1)} A/mm² exceeds 5 A/mm²: no thermal model supports that winding.`);
   if(tau>a.naturalPeriod/20)issues.push('Coil L/R time constant is not small against the motion: the quasi-static current assumption fails.');
@@ -191,8 +205,8 @@ function simulateTube(input={},stepScale=1) {
   if(Math.abs(Math.abs(last.x)-Math.abs(lastStart.x))>0.05*Math.max(max('x'),1e-9)+1e-9)issues.push('Response has not settled to a repeating cycle.');
   const dailyWh=loadPower*24*p.availability,auvNeedWh=p.auvWh*(1-p.auvArrivalSoc);
   return {a,RL,searched,points:r.points.map(v=>({...v,t:v.t-(20-3)*p.period,energy:v.energy-r.first[4]})),duration:r.duration,steps:r.steps,
-    extracted,loadPower,copperLoss,inputWork,residual,stroke,peakEmf,peakCurrent,currentDensity,minGap,coilSpan,tau,
-    naturalPeriod:a.naturalPeriod,tuningRatio:p.period/a.naturalPeriod,issues,dailyWh,auvNeedWh,
+    extracted,loadPower,copperLoss,frictionLoss,inputWork,residual,stroke,peakEmf,peakCurrent,currentDensity,minGap,coilSpan,tau,
+    naturalPeriod:a.naturalPeriod,tuningRatio:p.period/a.naturalPeriod,stiction,issues,dailyWh,auvNeedWh,
     chargesPerDay:dailyWh/auvNeedWh,hours:issues.length?null:(loadPower>0?1000/loadPower:null)};
 }
 
@@ -212,7 +226,8 @@ function tubeAt(model,time) {
   const primary=[['height','Wave height','m',0.1],['period','Wave period','s',0.5],
     ['tubeLength','Pipe travel length','mm',50],['boreDiameter','Pipe bore','mm',5],
     ['magnetDiameter','Magnet diameter','mm',5],['magnetLength','Magnet length','mm',5],
-    ['coils','Coils in series','',1],['coilTurns','Turns per coil','',50]];
+    ['coils','Coils in series','',1],['coilTurns','Turns per coil','',50],
+    ['tilt','Pipe tilt (0 vertical … 90 horizontal)','°',5],['frictionCoefficient','Bore friction coefficient','',0.005]];
   const advanced=[['springGap','Levitation / bumper gap','mm',5],['springStiffness','Added spring (0 = magnets only)','N/m',0.1],
     ['coilLength','Coil length','mm',5],['wireDiameter','Wire diameter','mm',0.05],['wallThickness','Pipe wall','mm',0.5],
     ['fluxLinkage','Flux linkage factor','',0.05],['remanence','Magnet remanence','T',0.05],['density','Magnet density','kg/m³',100],
@@ -302,11 +317,12 @@ function tubeAt(model,time) {
       ['Magnet mass',fmt(a.m,2)+' kg'],['Stroke (peak to peak)',fmt(model.stroke*1000,2)+' mm'],
       ['Peak EMF',volts(model.peakEmf)],
       ['Natural period',fmt(model.naturalPeriod,2)+' s vs '+fmt(p.period,1)+' s wave (×'+fmt(model.tuningRatio,1)+')'],
+      ['Friction vs wave forcing',fmt(model.stiction,2)+(model.stiction>1?' (magnet never breaks loose)':'')],
       ['Energy per day at this sea state',watts(model.dailyWh/24)+' average → '+wh(model.dailyWh)]];
     for(const [label,value] of rows){const box=document.createElement('div'),name=document.createElement('span'),v=document.createElement('strong');name.className='text-small';name.textContent=label;v.textContent=value;box.append(name,v);$('#metrics').append(box);}
     const sag=9.81/(a.w*a.w),ok=model.chargesPerDay>=1&&!model.issues.length;
     $('#verdict').className='verdict'+(ok?'':' short');
-    $('#verdict').textContent=`Charging a ${fmt(p.auvWh/1000,2)} kWh AUV from ${fmt(p.auvArrivalSoc*100,0)}% needs ${fmt(model.auvNeedWh/1000,2)} kWh: this pipe delivers ${fmt(model.chargesPerDay,4)} charges per day, or ${years(model.hours)} per kWh. To resonate at ${fmt(p.period,1)} s the suspension needs ${fmt(a.tunedStiffness,2)} N/m, and any vertical spring that soft sags at least ${fmt(sag,1)} m under this magnet — against ${fmt(a.h,2)} m of available travel.`;
+    $('#verdict').textContent=`Charging a ${fmt(p.auvWh/1000,2)} kWh AUV from ${fmt(p.auvArrivalSoc*100,0)}% needs ${fmt(model.auvNeedWh/1000,2)} kWh: this pipe delivers ${fmt(model.chargesPerDay,4)} charges per day, or ${years(model.hours)} per kWh. To resonate at ${fmt(p.period,1)} s the suspension needs ${fmt(a.tunedStiffness,2)} N/m; at ${fmt(p.tilt,0)}° tilt a spring that soft sags ${fmt(sag*Math.cos(a.tilt),1)} m under this magnet against ${fmt(a.h,2)} m of travel, while sliding friction runs at ${fmt(model.stiction,2)}× the wave forcing. Lying the pipe flat removes the sag and buys the friction instead.`;
     $('#limits').textContent=model.issues.length?model.issues.join(' '):`Within screening limits · ${model.steps.toLocaleString()} solver steps · energy residual ${(model.residual/Math.max(Math.abs(model.inputWork),1e-30)).toExponential(1)} of base work`;
     $('#limits').classList.toggle('error',!!model.issues.length);
     $('#notes').textContent='Regular waves only; availability scales a single sea state, it is not a wave climate. Not modeled: irregular seas, mooring, eddy-current and hysteresis loss, magnet tilt and rubbing in the bore, rectification and storage electronics, demagnetisation, seawater ingress, biofouling, fatigue of the end magnets.';

@@ -197,8 +197,9 @@ function simulateSystem(input={},stepScale=1) {
   const points=[];
   while(t<end-1e-10) {
     const hydroRate=(cw+rho*Ac*(Ac/Aj)**2*Math.abs(y[3]))/mw;
-    const target=t<start?start:Math.min(next,end);
+    const target=t<start-1e-10?start:Math.min(next,end);
     if(target-t<1e-10) {
+      t=target;                                   // guarantee progress: t a hair below start must not pin target
       if(!first)first=[...y];
       if(Math.abs(t-22*T)<1e-7)lastCycleStart=[...y];
       points.push(point(t,y,a));next=Math.min(end,next+T/200);

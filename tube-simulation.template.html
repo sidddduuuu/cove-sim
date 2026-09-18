@@ -35,7 +35,7 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
   <div class="controls" id="primary-controls"></div>
   <details>
     <summary>Suspension, winding and electrical assumptions</summary>
-    <div class="text-small">A sealed pipe floats and follows the wave. Inside, an axially magnetised magnet slides in the bore; coils wound outside see its flux move and the induced current opposes the motion. Repelling end magnets are scaled to hold the magnet's own weight at the levitation gap: with no added spring they <em>are</em> the suspension, otherwise they are end bumpers and the magnet is preloaded to mid-travel. Coil inductance is neglected (L/R is milliseconds against a multi-second wave) and flagged when that fails. Load resistance 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
+    <div class="text-small">A sealed pipe floats and follows the wave. Tilt trades one limit for another: upright, the suspension must hold the magnet up and a spring soft enough to resonate sags g·cos(tilt)/ω² (8.95 m at 6 s, whatever the magnet weighs); flat, the sag vanishes but the magnet rests on the bore and only moves if the friction coefficient stays under a·ω²/g — a ratio no bigger magnet can improve. Inside, an axially magnetised magnet slides in the bore; coils wound outside see its flux move and the induced current opposes the motion. Repelling end magnets are scaled to hold the magnet's own weight at the levitation gap: with no added spring they <em>are</em> the suspension, otherwise they are end bumpers and the magnet is preloaded to mid-travel. Coil inductance is neglected (L/R is milliseconds against a multi-second wave) and flagged when that fails. Load resistance 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
     <div class="controls" id="advanced-controls"></div>
   </details>
   <div id="validation" role="alert" class="error"></div>
@@ -70,7 +70,8 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
   const primary=[['height','Wave height','m',0.1],['period','Wave period','s',0.5],
     ['tubeLength','Pipe travel length','mm',50],['boreDiameter','Pipe bore','mm',5],
     ['magnetDiameter','Magnet diameter','mm',5],['magnetLength','Magnet length','mm',5],
-    ['coils','Coils in series','',1],['coilTurns','Turns per coil','',50]];
+    ['coils','Coils in series','',1],['coilTurns','Turns per coil','',50],
+    ['tilt','Pipe tilt (0 vertical … 90 horizontal)','°',5],['frictionCoefficient','Bore friction coefficient','',0.005]];
   const advanced=[['springGap','Levitation / bumper gap','mm',5],['springStiffness','Added spring (0 = magnets only)','N/m',0.1],
     ['coilLength','Coil length','mm',5],['wireDiameter','Wire diameter','mm',0.05],['wallThickness','Pipe wall','mm',0.5],
     ['fluxLinkage','Flux linkage factor','',0.05],['remanence','Magnet remanence','T',0.05],['density','Magnet density','kg/m³',100],
@@ -160,11 +161,12 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
       ['Magnet mass',fmt(a.m,2)+' kg'],['Stroke (peak to peak)',fmt(model.stroke*1000,2)+' mm'],
       ['Peak EMF',volts(model.peakEmf)],
       ['Natural period',fmt(model.naturalPeriod,2)+' s vs '+fmt(p.period,1)+' s wave (×'+fmt(model.tuningRatio,1)+')'],
+      ['Friction vs wave forcing',fmt(model.stiction,2)+(model.stiction>1?' (magnet never breaks loose)':'')],
       ['Energy per day at this sea state',watts(model.dailyWh/24)+' average → '+wh(model.dailyWh)]];
     for(const [label,value] of rows){const box=document.createElement('div'),name=document.createElement('span'),v=document.createElement('strong');name.className='text-small';name.textContent=label;v.textContent=value;box.append(name,v);$('#metrics').append(box);}
     const sag=9.81/(a.w*a.w),ok=model.chargesPerDay>=1&&!model.issues.length;
     $('#verdict').className='verdict'+(ok?'':' short');
-    $('#verdict').textContent=`Charging a ${fmt(p.auvWh/1000,2)} kWh AUV from ${fmt(p.auvArrivalSoc*100,0)}% needs ${fmt(model.auvNeedWh/1000,2)} kWh: this pipe delivers ${fmt(model.chargesPerDay,4)} charges per day, or ${years(model.hours)} per kWh. To resonate at ${fmt(p.period,1)} s the suspension needs ${fmt(a.tunedStiffness,2)} N/m, and any vertical spring that soft sags at least ${fmt(sag,1)} m under this magnet — against ${fmt(a.h,2)} m of available travel.`;
+    $('#verdict').textContent=`Charging a ${fmt(p.auvWh/1000,2)} kWh AUV from ${fmt(p.auvArrivalSoc*100,0)}% needs ${fmt(model.auvNeedWh/1000,2)} kWh: this pipe delivers ${fmt(model.chargesPerDay,4)} charges per day, or ${years(model.hours)} per kWh. To resonate at ${fmt(p.period,1)} s the suspension needs ${fmt(a.tunedStiffness,2)} N/m; at ${fmt(p.tilt,0)}° tilt a spring that soft sags ${fmt(sag*Math.cos(a.tilt),1)} m under this magnet against ${fmt(a.h,2)} m of travel, while sliding friction runs at ${fmt(model.stiction,2)}× the wave forcing. Lying the pipe flat removes the sag and buys the friction instead.`;
     $('#limits').textContent=model.issues.length?model.issues.join(' '):`Within screening limits · ${model.steps.toLocaleString()} solver steps · energy residual ${(model.residual/Math.max(Math.abs(model.inputWork),1e-30)).toExponential(1)} of base work`;
     $('#limits').classList.toggle('error',!!model.issues.length);
     $('#notes').textContent='Regular waves only; availability scales a single sea state, it is not a wave climate. Not modeled: irregular seas, mooring, eddy-current and hysteresis loss, magnet tilt and rubbing in the bore, rectification and storage electronics, demagnetisation, seawater ingress, biofouling, fatigue of the end magnets.';

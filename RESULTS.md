@@ -142,6 +142,73 @@ A vertical spring-mass tuned to a wave period sags g/ω² under its own weight, 
 | 10 | 0.395 | 24.85 |
 | 12 | 0.274 | 35.78 |
 
+## 6. Horizontal pipe: sizing for one AUV charge per day
+
+Lying the pipe flat takes gravity off the axis, so the suspension no longer has to hold the magnet up and can be tuned to the wave. The magnet then rests on the bore instead, and sliding friction replaces the sag as the limit. Both the friction force and the wave forcing scale with the magnet mass, so their ratio mu·g/(a·ω²) is a property of the sea state and the bearing alone — no magnet is heavy enough to break loose if it exceeds 1.
+
+| wave | breakaway limit on mu (a·ω²/g) |
+|---|---|
+| H 0.5 m, T 6 s | 0.028 |
+| H 1 m, T 6 s | 0.056 |
+| H 1 m, T 4 s | 0.126 |
+| H 1.5 m, T 5 s | 0.121 |
+| H 2 m, T 4 s | 0.252 |
+| H 2 m, T 8 s | 0.063 |
+
+### Friction is the whole design (12 m pipe, H 1 m, T 6 s)
+
+| bore friction mu | friction / wave forcing | load power | friction loss | stroke m | screen |
+|---|---|---|---|---|---|
+| 0.003 | 0.06 | 671.14 W | 60.00 W | 7.08 | ok |
+| 0.01 | 0.19 | 581.33 W | 223.08 W | 8.24 | ok |
+| 0.02 | 0.39 | 385.15 W | 448.07 W | 8.34 | ok |
+| 0.03 | 0.58 | 149.98 W | 517.42 W | 6.57 | ok |
+| 0.05 | 0.97 | 130.88 mW | 2.82 W | 0.03 | suppressed: Sliding friction is 0.97× the wave forci |
+| 0.1 | 1.93 | 17.61 mW | 1.07 W | 0.01 | suppressed: Sliding friction is 1.93× the wave forci |
+
+### How big it has to get (horizontal, tuned, mu 0.01, H 1 m / T 6 s)
+
+One 4.5 kWh AUV arriving at 10% needs 482 W of load power at 35% availability. Every dimension scales together; coils fill the pipe and the load is chosen for maximum power among the settings whose stroke still fits the travel.
+
+| bore | pipe m | magnet kg | coils | load power | stroke m | W per kg | charges/day |
+|---|---|---|---|---|---|---|---|
+| 50 mm | 1.0 | 0 | 16 | 7.95 mW | 0.43 | 0.017 | 0.00 |
+| 100 mm | 2.0 | 4 | 16 | 358.79 mW | 1.34 | 0.095 | 0.00 |
+| 200 mm | 4.0 | 30 | 16 | 7.01 W | 2.81 | 0.233 | 0.01 |
+| 400 mm | 8.0 | 241 | 16 | 118.35 W | 5.57 | 0.491 | 0.25 |
+| 500 mm | 10.0 | 471 | 16 | 286.88 W | 6.90 | 0.609 | 0.60 |
+| 550 mm | 11.0 | 627 | 16 | 414.14 W | 7.55 | 0.660 | 0.86 |
+| 600 mm | 12.0 | 814 | 16 | 581.33 W | 8.24 | 0.714 | 1.21 |
+| 650 mm | 13.0 | 1035 | 16 | 798.66 W | 8.92 | 0.771 | 1.66 |
+
+### The sized unit
+
+| quantity | value |
+|---|---|
+| bore | 600 mm |
+| pipe travel length | 12.0 m |
+| magnet | 480 × 600 mm NdFeB, 814 kg |
+| winding | 16 × 1500 turns of 5 mm wire |
+| tuning spring | 890 N/m → 6.00 s natural period |
+| stroke | 8.24 m peak to peak in 11.4 m of travel |
+| load / coil resistance | 1585 Ω / 44 Ω |
+| load power | 581.33 W |
+| copper loss | 16.02 W |
+| friction loss | 223.08 W |
+| peak EMF | 1938 V |
+| charges per day | 1.21 |
+
+### The same unit across sea states
+
+| sea state | load power | stroke m | charges/day |
+|---|---|---|---|
+| 0.5 m / 6 s | 140.83 W | 6.35 | 0.29 |
+| 1 m / 6 s | 581.33 W | 8.24 | 1.21 |
+| 1.5 m / 5 s | 1564.25 W | 9.04 | 3.24 |
+| 2 m / 4 s | 3751.28 W | 9.09 | 7.78 |
+| 2 m / 8 s | 534.16 W | 8.49 | 1.11 |
+| 1 m / 10 s | 52.04 W | 6.36 | 0.11 |
+
 ## Reading these numbers
 
 Every configuration here lands in the microwatt range while the prescribed jets carry tens of milliwatts to watts; conversion is 10⁻⁴ to 10⁻² percent because a 0.17–0.5 Hz pulse bends a 6 Hz strip quasi-statically. Adding cells on a shared source reduces total power (per-cell force ∝ 1/N, power ∝ 1/N², N cells → 1/N). Independent jets scale linearly but the total jet input must come from the wave-to-water stage, which the full-product model shows delivers under a watt of jet power at a 0.1 m wave. Charging a 1 kWh vehicle is 10⁴–10⁶ years in every case.
@@ -149,3 +216,5 @@ Every configuration here lands in the microwatt range while the prescribed jets 
 The pendulum node closes the gap because it puts tonnes, not grams, in motion at wave frequency and takes the energy out with a generator at ~80% instead of a piezo at 0.01%. The size needed is set by the physics of an inertial absorber (power scales with pendulum mass × wave height² ÷ period³): roughly a 10–12 m hull with a 6–10 t spring-tuned pendulum gives one small-survey charge per day in 1 m / 6 s seas; an 8 m hull with 3 t does it at a short-period 1.5 m site. The 4.5 m / 400 kg unit in the earlier design document makes single-digit watts in the same seas and is a sensor-power node, not an AUV charger. The charge session itself (3 h at 1.5 kW) always comes from the node battery; the waves decide how many sessions per day the battery can be refilled for.
 
 The PVC pipe generator removes the piezo conversion penalty — a coil and a magnet are an efficient transducer — and still lands in the nanowatt range as built, for a different reason: the suspension. Repelling end magnets strong enough to hold the magnet up are stiff (0.25 s natural period against a 6 s wave), so the magnet rides with the pipe instead of lagging it, and the relative stroke is under 2 mm. Softening the suspension to wave frequency is not a tuning choice but a geometry problem: a vertical spring-mass at 6 s sags 8.95 m under its own weight regardless of mass, more travel than the pipe has. Even granting the impossible spring, a 4 m pipe with a 40 kg magnet and 20 coils reaches single-digit watts. A pendulum escapes this because its restoring torque comes from gravity itself and a torsion spring adds stiffness without having to carry the weight, which is why the same 8.95 m appears as a hull dimension rather than a spring deflection.
+
+Laid flat the pipe escapes the sag and buys a friction problem instead: the magnet rests on the bore, and it only breaks loose if the bearing keeps mu below a·ω²/g — 0.056 in 1 m / 6 s seas, which rules out a magnet sliding on plastic and demands rollers or a radial bearing. Granted mu = 0.01, one AUV charge per day needs a 12 m pipe of 600 mm bore holding an 814 kg NdFeB magnet that strokes 8.2 m, for 581 W. That is the same 12 m length as the pendulum node for a similar duty, but the node makes its moving mass out of whatever is heavy and cheap, while here the moving mass has to be the magnet itself — roughly fifty thousand dollars of neodymium, plus an 8 m sliding seal, against a 10 t block of steel or concrete on a shaft.
