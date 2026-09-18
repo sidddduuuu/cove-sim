@@ -238,7 +238,7 @@ function tubeAt(model,time) {
   let model=simulateTube(settings),time=0,playing=false,last=0,frame,plotScales=[],timer;
   const fmt=(v,d=2)=>Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
   const watts=v=>{const a=Math.abs(v);return a<1e-6?fmt(v*1e9)+' nW':a<1e-3?fmt(v*1e6)+' µW':a<1?fmt(v*1e3)+' mW':a<1000?fmt(v,1)+' W':fmt(v/1000,2)+' kW';};
-  const years=h=>h===null?'—':fmt(h/8766,0)+' years';
+  const years=h=>h===null?'—':h<48?fmt(h,1)+' hours':h<8766?fmt(h/24,1)+' days':fmt(h/8766,0)+' years';
   const volts=v=>{const a=Math.abs(v);return a<1e-3?fmt(v*1e6,1)+' µV':a<1?fmt(v*1e3,2)+' mV':fmt(v,3)+' V';};
   const wh=v=>Math.abs(v)<0.01&&v!==0?Number(v).toExponential(2)+' Wh':fmt(v,3)+' Wh';
   function controls(items,target,type) {
@@ -287,7 +287,10 @@ function tubeAt(model,time) {
   }
   function renderPhase() {
     const pt=tubeAt(model,time),w=$('.scene').clientWidth,cx=w/2,a=model.a,p=a.p,mean=180;
-    const pipeM=p.tubeLength/1000,pxm=Math.min(140,200/Math.max(pipeM+p.height,0.2));
+    // The pipe is drawn at its actual tilt, so the scale has to fit both extents: a flat pipe is wide and
+    // shallow, an upright one narrow and tall.
+    const pipeM=p.tubeLength/1000,cs=Math.cos(a.tilt),sn=Math.sin(a.tilt);
+    const pxm=Math.min(140,200/Math.max(pipeM*cs+p.height,0.2),(w-40)/Math.max(pipeM*sn,0.1));
     // A 50 mm bore beside a 1 m pipe is a few pixels wide, and the relative stroke is often sub-millimetre.
     // Both are exaggerated so the mechanism reads, and the factors are stated under the drawing.
     const bore=pxm*p.boreDiameter/1000,wide=Math.max(1,18/Math.max(bore,1e-6));
@@ -295,7 +298,7 @@ function tubeAt(model,time) {
     const surface=d3.range(0,w+1,6).map(px=>[px,mean-pxm*p.height/2*Math.cos(a.k*(px-cx)/pxm-a.w*pt.t)]);
     d3.select($('.surface')).attr('d',d3.line().curve(d3.curveBasis)(surface));
     d3.select($('.sea')).attr('d',d3.line().curve(d3.curveBasis)(surface)+`L${w},320 L0,320 Z`);
-    d3.select($('.pipe')).attr('transform',`translate(${cx},${mean-pxm*pt.wave})`);
+    d3.select($('.pipe')).attr('transform',`translate(${cx},${mean-pxm*pt.wave}) rotate(${-p.tilt})`);
     const bw=bore*wide,wall=pxm*p.wallThickness/1000*wide;
     d3.select($('.body')).attr('x',-bw/2).attr('y',-pxm*pipeM/2).attr('width',bw).attr('height',pxm*pipeM).attr('rx',3);
     d3.select($('.coils')).selectAll('rect').data(a.offsets).join('rect')
@@ -304,7 +307,7 @@ function tubeAt(model,time) {
     const pos=a.xeq+pt.x*gain;                                   // magnet position in the pipe, exaggerated
     d3.select($('.magnet')).attr('x',-bw*p.magnetDiameter/p.boreDiameter/2).attr('y',-pxm*pos-pxm*p.magnetLength/2000)
       .attr('width',bw*p.magnetDiameter/p.boreDiameter).attr('height',Math.max(3,pxm*p.magnetLength/1000)).attr('rx',2);
-    $('.scale').textContent=`${fmt(pxm,0)} px/m vertical · bore and coils drawn ×${fmt(wide,0)} wider · magnet travel ×${fmt(gain,0)} · stroke ${fmt(model.stroke*1000,2)} mm`;
+    $('.scale').textContent=`${fmt(pxm,0)} px/m · pipe at ${fmt(p.tilt,0)}° · bore and coils drawn ×${fmt(wide,0)} wider · magnet travel ×${fmt(gain,0)} · stroke ${fmt(model.stroke,2)} m`;
     $('#phase').value=Math.round(time/model.duration*1000);$('#phase-value').textContent=fmt(pt.t)+' s';
     $('#instant').textContent=`wave ${fmt(pt.wave,2)} m · magnet ${fmt(pt.x*1000,2)} mm from rest · ${fmt(pt.v*1000,1)} mm/s · ${volts(pt.emf)} · ${fmt(pt.current*1e6,1)} µA · ${watts(pt.power)}`;
     for(const v of plotScales){v.svg.select('.cursor').attr('x1',v.x(pt.t)).attr('x2',v.x(pt.t));v.marker.attr('cx',v.x(pt.t)).attr('cy',v.y(pt[v.key]*v.mult));}
@@ -334,12 +337,13 @@ function tubeAt(model,time) {
     renderPhase();}
   function schedule(){clearTimeout(timer);root.classList.add('busy');timer=setTimeout(update,200);}
   function update() {
-    try {model=simulateTube(settings);time=Math.min(time,model.duration);$('#validation').textContent='';$('#play').disabled=false;$('#phase').disabled=false;$('.scene').style.opacity='1';metrics();redraw();}
+    try {model=simulateTube(settings);time=Number.isFinite(time)?Math.min(Math.max(0,time),model.duration):0;$('#validation').textContent='';$('#play').disabled=false;$('#phase').disabled=false;$('.scene').style.opacity='1';metrics();redraw();}
     catch(error) {stop();$('#validation').textContent=error.message+' Display retains the last valid inputs.';$('#play').disabled=true;$('#phase').disabled=true;$('.scene').style.opacity='0.35';}
     root.classList.remove('busy');
   }
   function stop(){playing=false;cancelAnimationFrame(frame);$('#play').textContent='Play';}
-  function tick(now){if(!playing)return;time=(time+Math.min((now-last)/1000,0.1))%model.duration;last=now;renderPhase();frame=requestAnimationFrame(tick);}
+  // Guard rather than diagnosis: a non-finite time here has been seen to blank the display mid-playback.
+  function tick(now){if(!playing)return;time=(time+Math.min((now-last)/1000,0.1))%model.duration;if(!Number.isFinite(time))time=0;last=now;renderPhase();frame=requestAnimationFrame(tick);}
   $('#play').addEventListener('click',()=>{if(playing){stop();return;}playing=true;last=performance.now();$('#play').textContent='Pause';frame=requestAnimationFrame(tick);});
   $('#phase').addEventListener('input',event=>{stop();time=Number(event.target.value)/1000*model.duration;renderPhase();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
