@@ -4,6 +4,7 @@ import {simulate} from './strip/model.mjs';
 import {simulateSheet} from './sheet/sheet.mjs';
 import {simulateSystem,systemDefaults} from './product/full-model.mjs';
 import {simulateNode,nodeDefaults} from './node/node-model.mjs';
+import {simulateCoveS,coveSDefaults} from './cove-s/cove-s-model.mjs';
 import {simulateTube,tubeParameters,tubeDefaults} from './tube/tube-model.mjs';
 const uW=v=>(v*1e6).toFixed(2),years=h=>h===null?'—':(h/8766).toLocaleString(undefined,{maximumFractionDigits:0});
 const lines=['# Simulation results','',`Generated ${new Date().toISOString().slice(0,10)} by \`node run.mjs\`. Screening-model outputs, not measurements. Defaults from MODEL.md unless a column says otherwise.`,''];
@@ -70,6 +71,19 @@ for(const [label,i] of [['default 12 m / 10 t, H 1 m T 6 s',{}],['default, H 0.5
 }
 table(['configuration','electrical W','capture width / hull length','pendulum swing °','kWh/day','session h','charges/day','screen'],rows6);
 
+// 5. Cove S: mobile wave-powered small-AUV service station
+lines.push('## 5. Cove S (mobile wave-powered small-AUV service station)','',`Defaults: ${coveSDefaults.days}-day variable offshore scenario, ${(coveSDefaults.batteryWh/1000).toFixed(0)} kWh station battery with ${(coveSDefaults.reserveSoc*100).toFixed(0)}% protected reserve, ${(coveSDefaults.ratedPowerW/1000).toFixed(1)} kW WEC, ${coveSDefaults.captureWidth} m effective capture width, ${(coveSDefaults.auvWh/1000).toFixed(1)} kWh AUV arriving at ${(coveSDefaults.auvArrivalSoc*100).toFixed(0)}%, and ${coveSDefaults.visitsPerDay} visit/day. Built-in sea histories are representative screening scenarios, not measured sites.`,'');
+const rowsCove=[];
+for(const [label,input] of [
+  ['design sea', {scenario:'design'}],['variable offshore',{}],['three-day calm spell',{scenario:'calm'}],['storm and survival',{scenario:'storm'}],
+  ['variable, 5 kWh AUV',{auvWh:5000}],['variable, 2 AUVs/day',{visitsPerDay:2}],
+  ['calm, 20 kWh station battery',{scenario:'calm',batteryWh:20000,initialSoc:0.7}]
+]) {
+  const m=simulateCoveS(input);
+  rowsCove.push([label,(m.generatedWh/1000).toFixed(1),m.completed,m.deferred,m.distanceKm.toFixed(0),(m.minBatteryWh/m.p.batteryWh*100).toFixed(0)+'%',(m.endBatteryWh/m.p.batteryWh*100).toFixed(0)+'%',m.issues.length?m.issues[0]:'closes']);
+}
+table(['scenario','wave kWh','AUVs charged','deferred','distance km','minimum SOC','ending SOC','result'],rowsCove);
+
 
 
 // Horizontal sizing: scale every dimension together, fill the pipe with coils, tune the spring to the wave,
@@ -94,8 +108,8 @@ function sizedPipe(s,{mu=0.01,height=1,period=6,turns=1500}={}) {
   return {best,travel};
 }
 
-// 5. PVC pipe linear generator
-lines.push('## 5. PVC pipe linear generator (magnet sliding through coils)','',`Defaults: ${tubeDefaults.tubeLength} mm travel in a ${tubeDefaults.boreDiameter} mm bore, ${tubeDefaults.magnetDiameter}×${tubeDefaults.magnetLength} mm NdFeB magnet (${tubeParameters().m.toFixed(2)} kg), ${tubeDefaults.coils}×${tubeDefaults.coilTurns} turns of ${tubeDefaults.wireDiameter} mm wire, load auto-matched. "Levitation" = no spring: the end magnets hold the magnet up and set the stiffness.`,'');
+// 6. PVC pipe linear generator
+lines.push('## 6. PVC pipe linear generator (magnet sliding through coils)','',`Defaults: ${tubeDefaults.tubeLength} mm travel in a ${tubeDefaults.boreDiameter} mm bore, ${tubeDefaults.magnetDiameter}×${tubeDefaults.magnetLength} mm NdFeB magnet (${tubeParameters().m.toFixed(2)} kg), ${tubeDefaults.coils}×${tubeDefaults.coilTurns} turns of ${tubeDefaults.wireDiameter} mm wire, load auto-matched. "Levitation" = no spring: the end magnets hold the magnet up and set the stiffness.`,'');
 const tube=(i)=>{const m=simulateTube(i);return [watts(m.loadPower),m.naturalPeriod.toFixed(2),(m.stroke*1000).toFixed(2),volts(m.peakEmf),m.issues.length?'suppressed: '+m.issues[0].slice(0,58):years(m.hours)];};
 const watts=v=>{const a=Math.abs(v);return a<1e-11?v.toExponential(1)+' W':a<1e-6?(v*1e9).toFixed(2)+' nW':a<1e-3?(v*1e6).toFixed(2)+' µW':a<1?(v*1e3).toFixed(2)+' mW':v.toFixed(2)+' W';};
 const volts=v=>{const a=Math.abs(v);return a<1e-3?(v*1e6).toFixed(0)+' µV':a<1?(v*1e3).toFixed(0)+' mV':v.toFixed(1)+' V';};
@@ -129,7 +143,7 @@ lines.push('### The tuning wall','','A vertical spring-mass tuned to a wave peri
 table(['wave period s','required stiffness / mass 1/s²','static sag m'],[4,6,8,10,12].map(T=>[T,(4*Math.PI**2/T**2).toFixed(3),(9.81*T*T/(4*Math.PI**2)).toFixed(2)]));
 
 
-lines.push('## 6. Horizontal pipe: sizing for one AUV charge per day','','Lying the pipe flat takes gravity off the axis, so the suspension no longer has to hold the magnet up and can be tuned to the wave. The magnet then rests on the bore instead, and sliding friction replaces the sag as the limit. Both the friction force and the wave forcing scale with the magnet mass, so their ratio mu·g/(a·ω²) is a property of the sea state and the bearing alone — no magnet is heavy enough to break loose if it exceeds 1.','');
+lines.push('## 7. Horizontal pipe: sizing for one AUV charge per day','','Lying the pipe flat takes gravity off the axis, so the suspension no longer has to hold the magnet up and can be tuned to the wave. The magnet then rests on the bore instead, and sliding friction replaces the sag as the limit. Both the friction force and the wave forcing scale with the magnet mass, so their ratio mu·g/(a·ω²) is a property of the sea state and the bearing alone — no magnet is heavy enough to break loose if it exceeds 1.','');
 table(['wave','breakaway limit on mu (a·ω²/g)'],[[0.5,6],[1,6],[1,4],[1.5,5],[2,4],[2,8]].map(([H,T])=>[`H ${H} m, T ${T} s`,(H/2*(2*Math.PI/T)**2/9.81).toFixed(3)]));
 
 lines.push('### Friction is the whole design (12 m pipe, H 1 m, T 6 s)','');

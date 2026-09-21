@@ -5,12 +5,13 @@ if(!d3)throw new Error('d3 bundle not found in strip/simulation.html');
 const inline=(file)=>readFileSync(file,'utf8')
   .replace(/^import .*$/mg,'')
   .replace(/^export (const|function) /mg,'$1 ');
-const strip=inline('strip/model.mjs'),sheet=inline('sheet/sheet.mjs'),full=inline('product/full-model.mjs').replace(/stripModel\(/g,'simulate('),node=inline('node/node-model.mjs'),tube=inline('tube/tube-model.mjs');
+const strip=inline('strip/model.mjs'),sheet=inline('sheet/sheet.mjs'),full=inline('product/full-model.mjs').replace(/stripModel\(/g,'simulate('),node=inline('node/node-model.mjs'),tube=inline('tube/tube-model.mjs'),coveS=inline('cove-s/cove-s-model.mjs');
 for(const [template,out,models] of [
   ['product/product-simulation.template.html','product/product-simulation.html',strip+'\n'+full],
   ['sheet/sheet-simulation.template.html','sheet/sheet-simulation.html',strip+'\n'+sheet],
   ['node/node-simulation.template.html','node/node-simulation.html',node],
-  ['tube/tube-simulation.template.html','tube/tube-simulation.html',tube]]) {
+  ['tube/tube-simulation.template.html','tube/tube-simulation.html',tube],
+  ['cove-s/cove-s-simulation.template.html','cove-s/cove-s-simulation.html',coveS]]) {
   const html=readFileSync(template,'utf8').replace('/*__D3__*/',()=>d3).replace('/*__MODEL__*/',()=>models);
   writeFileSync(out,html);
   console.log(out,html.length,'bytes');

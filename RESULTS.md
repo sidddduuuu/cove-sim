@@ -1,6 +1,6 @@
 # Simulation results
 
-Generated 2026-09-18 by `node run.mjs`. Screening-model outputs, not measurements. Defaults from MODEL.md unless a column says otherwise.
+Generated 2026-09-21 by `node run.mjs`. Screening-model outputs, not measurements. Defaults from MODEL.md unless a column says otherwise.
 
 ## 1. Full product (float → water column → jet → leaf)
 
@@ -91,7 +91,21 @@ Defaults: hull 12 m × Ø2.8 m, pendulum 10000 kg on a 1.1 m arm, spring-tuned t
 | 4.5 m / 0.4 t (earlier design doc), H 1 m T 6 s | 5 | 0.000 | 28 | 0.04 | 3.0 | 0.01 | ok |
 | default, gravity pendulum only (no spring) | 136 | 0.004 | 5 | 1.14 | 3.0 | 0.25 | ok |
 
-## 5. PVC pipe linear generator (magnet sliding through coils)
+## 5. Cove S (mobile wave-powered small-AUV service station)
+
+Defaults: 14-day variable offshore scenario, 60 kWh station battery with 20% protected reserve, 2.0 kW WEC, 0.35 m effective capture width, 3.0 kWh AUV arriving at 20%, and 1 visit/day. Built-in sea histories are representative screening scenarios, not measured sites.
+
+| scenario | wave kWh | AUVs charged | deferred | distance km | minimum SOC | ending SOC | result |
+|---|---|---|---|---|---|---|---|
+| design sea | 193.0 | 14 | 0 | 655 | 70% | 100% | closes |
+| variable offshore | 127.4 | 14 | 0 | 548 | 70% | 98% | closes |
+| three-day calm spell | 82.8 | 14 | 0 | 388 | 70% | 80% | The WEC feathers during cut-in or survival sea states. |
+| storm and survival | 207.1 | 14 | 0 | 545 | 70% | 98% | The WEC feathers during cut-in or survival sea states. |
+| variable, 5 kWh AUV | 127.4 | 14 | 0 | 548 | 70% | 92% | closes |
+| variable, 2 AUVs/day | 127.4 | 28 | 0 | 548 | 70% | 89% | closes |
+| calm, 20 kWh station battery | 82.8 | 14 | 0 | 388 | 29% | 41% | The WEC feathers during cut-in or survival sea states. |
+
+## 6. PVC pipe linear generator (magnet sliding through coils)
 
 Defaults: 1000 mm travel in a 50 mm bore, 40×50 mm NdFeB magnet (0.47 kg), 1×1000 turns of 0.5 mm wire, load auto-matched. "Levitation" = no spring: the end magnets hold the magnet up and set the stiffness.
 
@@ -142,7 +156,7 @@ A vertical spring-mass tuned to a wave period sags g/ω² under its own weight, 
 | 10 | 0.395 | 24.85 |
 | 12 | 0.274 | 35.78 |
 
-## 6. Horizontal pipe: sizing for one AUV charge per day
+## 7. Horizontal pipe: sizing for one AUV charge per day
 
 Lying the pipe flat takes gravity off the axis, so the suspension no longer has to hold the magnet up and can be tuned to the wave. The magnet then rests on the bore instead, and sliding friction replaces the sag as the limit. Both the friction force and the wave forcing scale with the magnet mass, so their ratio mu·g/(a·ω²) is a property of the sea state and the bearing alone — no magnet is heavy enough to break loose if it exceeds 1.
 

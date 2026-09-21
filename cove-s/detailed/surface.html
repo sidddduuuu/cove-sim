@@ -1,0 +1,269 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cove S · Above-water module</title>
+<style>
+:root{color-scheme:dark;--bg:#08151d;--panel:#102530;--ink:#e8f1f4;--muted:#b0c5ce;--line:#29424f;--sea:#59c8e9;--power:#ffc66b;--green:#86e1b2}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}a{color:var(--sea)}header,main{max-width:1440px;margin:auto;padding:24px}header{padding-bottom:0}h1{font-size:32px;font-weight:550;margin:12px 0 4px}h2{font-size:19px;font-weight:550;margin:0 0 12px}p{margin:8px 0}nav{display:flex;gap:10px;flex-wrap:wrap}nav a{padding:9px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none}nav a.active{background:var(--sea);color:var(--bg)}.muted,small{color:var(--muted)}.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:22px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}.controls label{display:block;margin-top:13px}.controls input,.controls select{width:100%;accent-color:var(--sea)}select,button,input[type=number]{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px;font:inherit}button{cursor:pointer;min-height:40px}button:hover{border-color:var(--sea)}output{float:right;color:var(--sea);font-variant-numeric:tabular-nums}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}.metric{background:var(--panel);border:1px solid var(--line);padding:13px;border-radius:10px}.metric b{display:block;font-size:23px;font-weight:550}.metric span{color:var(--muted);font-size:12px}.visual{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px}canvas{display:block;width:100%}.diagram{height:440px}.key{margin:0;padding:0;list-style:none;display:grid;gap:6px;align-content:start}.key li{font-size:12px;display:flex;align-items:baseline;gap:8px}.key b{color:var(--power);min-width:19px}.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.chart{height:210px}.wide{grid-column:1/-1}.status{border-left:3px solid var(--power);padding:6px 12px;margin:12px 0;background:#ffc66b0a}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}.toolbar input{flex:1;min-width:130px}.tag{color:var(--power);text-transform:uppercase;letter-spacing:.1em;font-size:11px}.sources{margin-top:22px}details{margin-top:12px}summary{cursor:pointer}table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:8px;border-bottom:1px solid var(--line)}.note{font-size:13px}#provenance{font-size:12px;overflow-wrap:anywhere}.controls summary{color:var(--sea)}@media(max-width:1000px){.visual{grid-template-columns:1fr}.key{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:1fr 1fr}}@media(max-width:700px){header,main{padding:16px}.layout{grid-template-columns:1fr}.controls{display:grid;grid-template-columns:1fr 1fr;gap:0 15px}.controls h2,.controls .wide,.controls details{grid-column:1/-1}.charts{grid-template-columns:1fr}.diagram{height:370px}h1{font-size:26px}.metric b{font-size:20px}.key{grid-template-columns:1fr 1fr}nav a{font-size:13px;padding:8px}.controls label{min-width:0}}
+</style></head><body><header><div class="tag">Cove S / engineering exploration</div><h1>Above-water module</h1><p class="muted">Hull motion, wind loading, generator and deck equipment.</p><nav><a class="" href="whole.html">Whole system</a><a class="" href="power.html">Wave power & connection length</a><a class="" href="underwater.html">Underwater service module</a><a class="active" href="surface.html">Above-water module</a></nav></header><main><div class="layout"><aside class="panel controls"><h2>Ocean & operating conditions</h2>
+<label class="wide">Recorded condition<select id="preset"></select></label><p class="wide" id="provenance"></p>
+<label>Significant wave height <output id="H-out"></output><input id="H" type="range" min="0" max="16" step=".01"></label>
+<label>Peak period <output id="T-out"></output><input id="T" type="range" min="3" max="20" step=".01"></label>
+<label>Mean wind <output id="wind-out"></output><input id="wind" type="range" min="0" max="60" step=".1"></label>
+<label>Gust wind <output id="gust-out"></output><input id="gust" type="range" min="0" max="80" step=".1"></label>
+<label>Ocean current (assumed) <output id="current-out"></output><input id="current" type="range" min="-2" max="2" step=".05"></label>
+<label>Ground speed target <output id="speed-out"></output><input id="speed" type="range" min="0" max="2" step=".05"></label>
+<label>Deployed connection length <output id="L-out"></output><input id="L" type="range" min="3" max="50" step="1"></label>
+<label>Connection type<select id="joint"><option value="compliant">Compliant / telescoping PTO</option><option value="rigid">Rigid lock comparison</option></select></label>
+<label>Dock charge request<select id="charge"><option value="false">Off</option><option value="true">On — 1.5 kW delivered</option></select></label>
+<details><summary>Hardware assumptions</summary><label>PTO damping <output id="pto-out"></output><input id="pto" type="range" min="0" max="20000" step="500"></label><label>Connection diameter <output id="diameter-out"></output><input id="diameter" type="range" min=".04" max=".5" step=".01"></label><label>Water drag multiplier <output id="cd-out"></output><input id="cd" type="range" min=".3" max="2" step=".1"></label><label>Air drag coefficient <output id="airCd-out"></output><input id="airCd" type="range" min=".4" max="2" step=".1"></label><p class="note">Current and ground speed are signed along one axis. Wind and waves act along the positive axis. Hardware drag coefficients and response coefficients are assumptions.</p></details>
+<button id="download" class="wide">Download this run (JSON)</button></aside>
+<section><div id="metrics" class="metrics"></div><div class="panel"><div class="tag">Labelled components · schematic motion, not CAD</div><div class="toolbar"><button id="play">Pause</button><label for="time">Time</label><input id="time" type="range" min="0" max="179.8" step=".2" value="0"><output id="clock">0.0 s</output></div><div class="visual"><canvas id="diagram" class="diagram" aria-label="Animated labelled components of Above-water module"></canvas><ol id="key" class="key"></ol></div><p class="note muted">Vertical movement is magnified for visibility; connection depth is compressed. Wave realization is synthesized from measured sea-state statistics. Playback stops at 180 seconds.</p></div><div id="warnings" class="status" aria-live="polite"></div><div id="charts" class="charts"></div><div class="panel sources"><h2>What the numbers mean</h2><p id="explanation"></p><p class="note">This is a two-body heave and load-screening model with assumed hardware coefficients. It does not establish survivability, station-keeping capability, fatigue life, or dock capture success. Forces are signed along the positive travel axis. Wind/gust and underwater drag are calculated separately; gust is an envelope, not a measured time history.</p><details><summary>Model, sources and limitations</summary><p>NOAA NDBC station 46005, 2024: <span id="record-count"></span> simultaneous valid wave-height, dominant-period and mean-wind observations. Presets select actual timestamped rows by wave-height percentile; wind is taken from that same row. Current is user-assumed. This is one ocean location, not worldwide coverage.</p><p>Irregular waves use 24 deterministic-phase Pierson–Moskowitz components normalized to Hs/4 variance. DPD is used as the peak period, not the energy period. Linear deep-water decay exp(−kL) changes excitation at depth. Coupled heave includes connection stiffness EA/L, PTO damping, added mass, restoring stiffness and equivalent viscous damping. Horizontal connection drag is integrated over 12 depth segments.</p><p>Fixed assumptions: effective masses 11 / 18 tonnes; waterplane 12 m²; lower restoring 2 kN/m; radiation damping 7 / 5 kN·s/m; effective connection EA 100 kN; 2 kW electrical ceiling; 68% efficiency; 18% mechanical allocation to foils with 45% assumed propulsive efficiency. Length is the mean submerged depth of a vertical compliant guide/tether arrangement, not a designed solid structural pillar.</p><p>Two-way PTO damping assumes an engineered bidirectional mechanism. Support paths must permit PTO travel; taut fixed-length parallel tethers would bypass it. Battery mass is lumped into the lower effective mass. Pressure pods, structural stiffness, drag and foil efficiency are not validated from the illustrative CAD. No slamming, breaking-wave impact, mooring, pitch/roll, tether bending, buckling, seabed clearance or full hydrodynamic interaction is resolved.</p><p>Storms above Hs 4.5 m switch off generation and charging. Motion/load outputs then remain unvalidated linear extrapolations. Exceeding ±1.5 m stroke or 40 kN dynamic connection force flags an invalid operating envelope; neither threshold is a certified hardware rating. Model power is not guaranteed deliverable power outside that envelope.</p><ul><li><a href="https://www.ndbc.noaa.gov/data/historical/stdmet/46005h2024.txt.gz">NOAA source observations (archived locally)</a></li><li><a href="https://www.ndbc.noaa.gov/faq/measdes.shtml">NOAA definitions and units</a></li><li><a href="https://wec-sim.github.io/WEC-Sim/dev/theory/theory.html">WEC-Sim theory reference</a> — this dashboard does not run WEC-Sim or use measured hydrodynamic coefficients.</li><li><a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/drag-equation/">NASA drag equation</a></li><li><a href="https://ocean.weather.gov/product_description/keyterm.php">NOAA wave-height interpretation</a></li><li><a href="MODEL.md">Full local model documentation</a></li></ul></details></div></section></div></main>
+<script>
+// SI units. Two-body linear frequency response; assumed coefficients, not BEM results.
+const defaults={H:2.14,T:6.25,wind:10.6,gust:13.6,current:.3,speed:.5,L:20,diameter:.12,pto:6000,EA:100000,rigid:false,cd:1,airCd:1.1,charge:false,seconds:180};
+const rho=1025,g=9.81,air=1.225;
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1]], sub=(a,b)=>[a[0]-b[0],a[1]-b[1]], mul=(a,b)=>[a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]], scale=(a,s)=>a.map(x=>x*s), div=(a,b)=>{let d=b[0]**2+b[1]**2;return [(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d]};
+const drag=(density,cd,area,v)=>.5*density*cd*area*v*Math.abs(v);
+function spectrum(H,T,n=24){
+ const wp=2*Math.PI/T, dw=wp*2.7/n;
+ let terms=Array.from({length:n},(_,i)=>{const w=wp*.45+(i+.5)*dw;return {w,k:w*w/g,s:w**-5*Math.exp(-1.25*(wp/w)**4),phase:((i*2.3999632297+.71)% (2*Math.PI))};});
+ const sum=terms.reduce((s,x)=>s+x.s,0);
+ return terms.map(x=>({...x,a:Math.sqrt(2*(H/4)**2*x.s/sum)}));
+}
+function response(input={}){
+ const p={...defaults,...input};
+ for(const k of Object.keys(defaults))if(typeof defaults[k]==='number'&&!Number.isFinite(p[k]))throw Error(`Invalid ${k}`);
+ if(p.L<1||p.L>60||p.T<2||p.T>22||p.H<0||p.H>20||p.pto<0||p.EA<=0||p.cd<0||p.airCd<0||p.diameter<=0||p.seconds<=0)throw Error('Outside model bounds');
+ const storm=p.H>4.5, damping=storm?300:p.pto, stiffness=p.rigid?1e10:p.EA/p.L;
+ const ms=11000,mu=18000,ks=rho*g*12,ku=2000;
+ // Representative equivalent linear viscous damping based on incident RMS orbital velocity.
+ const vrms=p.H/4*2*Math.PI/p.T,bs=7000+rho*p.cd*10*vrms*.8,bu=5000+rho*p.cd*13.5*vrms*Math.exp(-((2*Math.PI/p.T)**2)/g*p.L)*.8;
+ const terms=spectrum(p.H,p.T).map(x=>{
+  const q=[stiffness,x.w*damping],A=add([ks-ms*x.w*x.w,x.w*bs],q),D=add([ku-mu*x.w*x.w,x.w*bu],q);
+  const attenuation=Math.exp(-x.k*p.L);
+  const fs=[ks*x.a,0],fu=[-rho*5*x.a*x.w*x.w*attenuation,0];
+  const det=sub(mul(A,D),mul(q,q));
+  const z1=div(add(mul(fs,D),mul(q,fu)),det),z2=div(add(mul(A,fu),mul(q,fs)),det);
+  return {...x,z1,z2,attenuation};
+ });
+ return {p,terms,storm,damping,stiffness,bs,bu};
+}
+function harmonic(z,w,theta){const c=Math.cos(theta),s=Math.sin(theta);return [z[0]*c-z[1]*s,-w*(z[0]*s+z[1]*c)];}
+function instant(model,t){
+ const {p,terms,damping,stiffness,storm}=model;
+ let eta=0,zs=0,zu=0,vs=0,vu=0,orb=0,orbDeep=0;const segment=Array(12).fill(0);
+ for(const x of terms){const th=x.w*t+x.phase,c=Math.cos(th);eta+=x.a*c;
+  const a=harmonic(x.z1,x.w,th),b=harmonic(x.z2,x.w,th);zs+=a[0];vs+=a[1];zu+=b[0];vu+=b[1];
+  orb+=x.a*x.w*c;orbDeep+=x.a*x.w*c*x.attenuation;
+  for(let j=0;j<12;j++)segment[j]+=x.a*x.w*c*Math.exp(-x.k*p.L*(j+.5)/12);
+ }
+ const rel=zs-zu,rv=vs-vu,ptoForce=damping*rv,elastic=stiffness*rel,mechanical=damping*rv*rv;
+ // 18% allocation to foils avoids counting the same energy twice.
+ const foil=storm?0:mechanical*.18, shaft=storm?0:mechanical*.82,converted=shaft*.68,power=Math.min(2000,converted);
+ const waterSurface=drag(rho,.7*p.cd,3,p.current+orb-p.speed),waterUnder=drag(rho,p.cd,2.8,p.current+orbDeep-p.speed);
+ const beam=segment.reduce((s,v)=>s+drag(rho,1.2*p.cd,p.diameter*p.L/12,p.current+v-p.speed),0);
+ const windForce=drag(air,p.airCd,5,p.wind-p.speed),gustForce=drag(air,p.airCd,5,p.gust-p.speed);
+ const dragTotal=waterSurface+waterUnder+beam+windForce;
+ // Force balance at imposed ground speed; no claimed free-running propulsion map.
+ const foilThrust=foil*.45/Math.max(.3,Math.abs(p.speed-p.current));
+ const required=Math.max(0,-dragTotal),deficit=Math.max(0,required-foilThrust);
+ const holdW=deficit*Math.max(.3,Math.abs(p.speed-p.current))/.45;
+ return {t,eta,zs,zu,vs,vu,rel,rv,mechanical,power,foil,loss:mechanical-power-foil,ptoForce,connection:elastic+ptoForce,
+ waterSurface,waterUnder,beam,windForce,gustForce,dragTotal,holdW,foilThrust,orbDeep,pressureBar:1.013+rho*g*p.L/1e5};
+}
+function simulate(input={}){
+ const model=response(input),{p}=model,points=[];let battery=42000,generated=0,loads=0,curtailed=0,unserved=0,strokeMin=Infinity,strokeMax=-Infinity,peakForce=0;
+ const dt=.2;for(let t=0;t<p.seconds-1e-8;t+=dt){const s=instant(model,t),step=Math.min(dt,p.seconds-t),charge=p.charge&&!model.storm&&Math.abs(s.vu)<.2&&battery>12000?1500:0;
+ const load=60+s.holdW+charge/.85,energy=s.power*step/3600,demand=load*step/3600;
+ const raw=battery+energy-demand;curtailed+=Math.max(0,raw-60000);unserved+=Math.max(0,-raw);battery=Math.max(0,Math.min(60000,raw));generated+=energy;loads+=demand;
+ strokeMin=Math.min(strokeMin,s.rel);strokeMax=Math.max(strokeMax,s.rel);peakForce=Math.max(peakForce,Math.abs(s.connection));
+ points.push({...s,battery,charge,load});}
+ const avg=k=>points.reduce((s,x)=>s+x[k],0)/points.length;
+ const peak=k=>Math.max(...points.map(x=>Math.abs(x[k])));
+ const warnings=[];
+ if(model.storm)warnings.push('Survival mode: generation and charging disabled. Extreme-wave motion is an extrapolation, not a survival prediction.');
+ if(peak('rel')>1.5)warnings.push('Assumed ±1.5 m PTO travel exceeded: computed power is outside the usable stroke envelope.');
+ if(peakForce>40000)warnings.push('Dynamic connection force exceeds the assumed 40 kN screening limit. Static preload and fatigue must be added.');
+ if(p.rigid)warnings.push('Rigid-lock comparison: relative heave and useful PTO power approach zero.');
+ if(p.H>p.L*.5)warnings.push('Shallow submergence relative to wave height: linear submerged-body assumptions unreliable.');
+ if(p.L>1/(2*Math.PI/p.T)**2*g*3)warnings.push('Long connection: lower orbital motion but more connection drag.');
+ return {model,points,avgPower:avg('power'),avgLoad:avg('load'),stroke:strokeMax-strokeMin,peakForce,generated,loads,curtailed,unserved,battery,
+ residual:42000+generated-loads-curtailed+unserved-battery,waterDrag:avg('waterSurface')+avg('waterUnder'),beamDrag:avg('beam'),windDrag:avg('windForce'),pressure:points[0].pressureBar,underRms:Math.sqrt(avgSquared(points,'zu')),surfaceRms:Math.sqrt(avgSquared(points,'zs')),warnings};
+}
+function avgSquared(points,key){return points.reduce((s,x)=>s+x[key]**2,0)/points.length;}
+
+const OBS={
+  "station": "46005",
+  "year": 2024,
+  "url": "https://www.ndbc.noaa.gov/data/historical/stdmet/46005h2024.txt.gz",
+  "sha256": "42deabc8d00f5ef8af9340e53007e8b7490f3bb3a955d7a2b9796bd9d2e8b5bc",
+  "validRows": 15523,
+  "presets": [
+    {
+      "time": "2024-09-04T17:10:00Z",
+      "H": 0.59,
+      "T": 7.69,
+      "wind": 2.5,
+      "gust": 3.6,
+      "label": "Observed 0th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-06-26T03:40:00Z",
+      "H": 1.07,
+      "T": 14.81,
+      "wind": 4.6,
+      "gust": 6.6,
+      "label": "Observed 5th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-09-20T03:10:00Z",
+      "H": 1.53,
+      "T": 5.56,
+      "wind": 6.8,
+      "gust": 8.6,
+      "label": "Observed 25th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-09-11T04:10:00Z",
+      "H": 2.14,
+      "T": 6.25,
+      "wind": 10.6,
+      "gust": 13.6,
+      "label": "Observed 50th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-02-04T22:40:00Z",
+      "H": 3.16,
+      "T": 7.14,
+      "wind": 12.6,
+      "gust": 16.0,
+      "label": "Observed 75th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-02-18T02:40:00Z",
+      "H": 4.41,
+      "T": 14.81,
+      "wind": 4.2,
+      "gust": 6.0,
+      "label": "Observed 90th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-11-03T19:40:00Z",
+      "H": 5.86,
+      "T": 14.81,
+      "wind": 7.7,
+      "gust": 9.7,
+      "label": "Observed 97th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-02-03T01:10:00Z",
+      "H": 7.29,
+      "T": 13.79,
+      "wind": 13.0,
+      "gust": 17.8,
+      "label": "Observed 99.5th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-01-09T14:40:00Z",
+      "H": 9.31,
+      "T": 13.79,
+      "wind": 15.6,
+      "gust": 22.7,
+      "label": "Observed 100th percentile by wave height",
+      "kind": "observed"
+    }
+  ],
+  "notes": "Simultaneous valid WVHT, DPD and WSPD only. Percentiles describe this filtered station-year, not global oceans. No current measurements in this file."
+}
+;
+const VIEW='surface';
+const $=id=>document.getElementById(id),units={H:'m',T:'s',wind:'m/s',gust:'m/s',current:'m/s',speed:'m/s',L:'m',pto:'N·s/m',diameter:'m',cd:'×',airCd:''};
+let params={...defaults},run,frameIndex=0,playing=!matchMedia('(prefers-reduced-motion: reduce)').matches,dirty=false,custom=false,last=performance.now();
+const presets=[{label:'Stress test · flat calm',H:0,T:6,wind:0,gust:0,kind:'stress'},...OBS.presets,{label:'Stress test · extreme storm, Hs 16 m',H:16,T:18,wind:45,gust:60,kind:'stress'}];
+$('preset').innerHTML=presets.map((p,i)=>`<option value="${i}">${p.label} · ${p.H} m</option>`).join('');$('preset').value='4';$('record-count').textContent=OBS.validRows.toLocaleString();
+const keys={
+ whole:['Surface hull / waterplane','Navigation & radio mast','PTO / generator enclosure','Main battery pressure pods','Compliant connection / umbilical','Reaction plate / lower frame','AUV capture funnel','Dock latch & charging contacts','Forward wave-driven foil','Aft wave-driven foil','Electric trim thruster','Docked AUV'],
+ power:['Surface float / waterplane','PTO cable or sliding rod','Guide and service loop','Bidirectional PTO drum','Generator rotor & stator','Rectifier and DC converter','Battery / charging bus','Compliant connection spring','Submerged reaction plate','Depth-varying wave orbit'],
+ underwater:['Pressure pod — battery port','Pressure pod — battery starboard','Reaction plate / structural frame','Compliant connection joint','Dock capture funnel','Vehicle guides & capture latches','Charger / power electronics','AUV body & charging interface','Forward hinged propulsion foil','Aft hinged propulsion foil','Foil actuator / pivot','Electric trim thruster','Acoustic docking beacon'],
+ surface:['Surface hull / waterplane','Deckhouse / autonomy computer','Satellite / GNSS / navigation mast','PTO guide and moving rod','PTO drum / bearing supports','Generator / shaft coupling','Rectifier / DC power converter','Auxiliary battery (concept allowance)','Access hatch / seal','Electrical umbilical strain relief','Hull rub rail / spray edge','Wind-exposed superstructure']};
+$('key').innerHTML=keys[VIEW].map((s,i)=>`<li><b>${i+1}</b>${s}</li>`).join('');
+const explanations={whole:'Shared system response: wave input drives coupled motion, with captured mechanical energy split between generation and foil propulsion. The battery supplies electronics, requested dock charging and estimated thrust assistance. Ground speed is imposed; the model estimates the force and power deficit needed to sustain it rather than claiming an achieved speed.',power:'Changing deployed length alters wave attenuation, spring stiffness and connection drag. The length sweep holds the sea state and all other inputs fixed. The rigid-lock case nearly removes relative heave, demonstrating why a fixed pillar cannot drive this PTO. Peak connection force includes dynamic spring and damper forces, but not static weight/preload.',underwater:'The lower assembly includes the main battery pressure pods, dock, reaction plate, hinged fins and trim thruster. Depth changes orbital flow, drag, pressure and heave. Charging is gated by survival state, a simplified lower-body vertical-speed threshold, and battery reserve; it is not a docking-success model.',surface:'The upper hull experiences aerodynamic load on the exposed structure, hydrodynamic hull drag and vertical wave excitation. Generator, controls and a small auxiliary battery sit on the upper body; the main battery remains in underwater pods. Wind and gust forces are shown separately from wave-driven motion.'};$('explanation').textContent=explanations[VIEW];
+function applyPreset(){const q=presets[+$('preset').value];Object.assign(params,{H:q.H,T:q.T,wind:q.wind,gust:q.gust??q.wind});custom=false;sync();recompute();}
+function sync(){for(const k in units){$(k).value=params[k];$(k+'-out').textContent=`${Number(params[k]).toFixed(k==='pto'||k==='L'?0:2)} ${units[k]}`;}}
+for(const k in units)$(k).addEventListener('input',()=>{params[k]=+$(k).value;if(['H','T','wind','gust'].includes(k))custom=true;sync();dirty=true;});
+$('joint').onchange=()=>{params.rigid=$('joint').value==='rigid';dirty=true;};$('charge').onchange=()=>{params.charge=$('charge').value==='true';dirty=true;};$('preset').onchange=applyPreset;
+$('play').onclick=()=>{if(frameIndex>=run.points.length-1)frameIndex=0;playing=!playing;$('play').textContent=playing?'Pause':'Play';};
+$('time').oninput=()=>{frameIndex=Math.min(run.points.length-1,Math.round(+$('time').value/.2));playing=false;$('play').textContent='Play';render();};
+$('download').onclick=()=>{const data={view:VIEW,environmentSource:custom?'User modified observed preset':presets[+$('preset').value],sourceArchive:OBS.url,sourceSha256:OBS.sha256,parameters:params,summary:{averageW:run.avgPower,strokeM:run.stroke,peakDynamicForceN:run.peakForce,energyResidualWh:run.residual,warnings:run.warnings},points:run.points};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=`cove-s-${VIEW}-run.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+let timer;document.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>{if(dirty)recompute();},180);});
+function metric(label,value,unit){return `<div class="metric"><span>${label}</span><b>${value} <small>${unit}</small></b></div>`;}
+function recompute(){dirty=false;run=simulate(params);frameIndex=0;
+ const q=presets[+$('preset').value];$('provenance').textContent=(custom?'CUSTOM: environmental values modified. ':q.kind==='observed'?`NOAA 46005 · ${q.time} · `:'SYNTHETIC STRESS TEST · ')+(q.kind==='observed'&&!custom?'Measured Hs, peak period, mean wind and gust. ':'Not a measured sea state. ')+'Current and hardware response assumed.';
+ const m={whole:[['Model generation',run.avgPower.toFixed(0),'W'],['Average demand',run.avgLoad.toFixed(0),'W'],['Battery after 3 min',(run.battery/600).toFixed(2),'%'],['Travel required', (params.speed*180).toFixed(0),'m']],power:[['Model generation',run.avgPower.toFixed(0),'W'],['Relative stroke',run.stroke.toFixed(2),'m'],['Peak dynamic load',(run.peakForce/1000).toFixed(1),'kN'],['Mean connection drag',run.beamDrag.toFixed(0),'N']],underwater:[['Absolute pressure',run.pressure.toFixed(2),'bar'],['Lower heave RMS',run.underRms.toFixed(2),'m'],['Mean lower drag',(run.points.reduce((s,p)=>s+p.waterUnder,0)/run.points.length).toFixed(0),'N'],['Battery after 3 min',(run.battery/600).toFixed(2),'%']],surface:[['Upper heave RMS',run.surfaceRms.toFixed(2),'m'],['Mean air load',run.windDrag.toFixed(0),'N'],['Gust air load',run.points[0].gustForce.toFixed(0),'N'],['Model generation',run.avgPower.toFixed(0),'W']]};$('metrics').innerHTML=m[VIEW].map(x=>metric(...x)).join('');
+ $('warnings').textContent=run.warnings.length?run.warnings.join(' '):'Within the assumed stroke/load screen for this run. Hardware coefficients remain unvalidated; this is not a safety approval.';
+ makeCharts();render();}
+const colors={sea:'#59c8e9',power:'#ffc66b',green:'#86e1b2',muted:'#b0c5ce',ink:'#e8f1f4',line:'#29424f',hull:'#cc7837',pod:'#32778b',dark:'#102530'};
+function canvas(id){const el=$(id),w=el.clientWidth,h=el.clientHeight,dpr=window.devicePixelRatio||1;if(el.width!==Math.round(w*dpr)||el.height!==Math.round(h*dpr)){el.width=Math.round(w*dpr);el.height=Math.round(h*dpr);}const c=el.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);return {c,w,h};}
+function drawDiagram(s){const {c,w,h}=canvas('diagram'),sx=w/640,sy=h/460;const X=x=>x*sx,Y=y=>y*sy;let coords=[];
+ const line=(x,y,x2,y2,color=colors.muted,width=2)=>{c.strokeStyle=color;c.lineWidth=width;c.beginPath();c.moveTo(X(x),Y(y));c.lineTo(X(x2),Y(y2));c.stroke();};
+ const box=(x,y,ww,hh,color=colors.dark)=>{c.fillStyle=color;c.strokeStyle=colors.muted;c.lineWidth=1;c.beginPath();c.roundRect(X(x),Y(y),ww*sx,hh*sy,5);c.fill();c.stroke();};
+ const ellipse=(x,y,rx,ry,col)=>{c.fillStyle=col;c.beginPath();c.ellipse(X(x),Y(y),rx*sx,ry*sy,0,0,7);c.fill();};
+ const text=(str,x,y,col=colors.muted)=>{c.fillStyle=col;c.font='12px system-ui';c.fillText(str,X(x),Y(y));};
+ const mark=(n,x,y)=>coords.push([n,x,y]);
+ const wave=(y)=>{c.fillStyle='#59c8e90b';c.fillRect(0,Y(y),w,h-Y(y));c.beginPath();for(let x=0;x<=640;x+=4){let yy=y+Math.min(18,params.H*4)*Math.sin(x/60-s.t*2*Math.PI/params.T);x?c.lineTo(X(x),Y(yy)):c.moveTo(X(x),Y(yy));}c.strokeStyle=colors.sea;c.lineWidth=2;c.stroke();};
+ const prop=(x,y)=>{ellipse(x,y,17,17,colors.dark);for(let j=0;j<3;j++){let a=s.t*3+j*Math.PI*2/3;line(x,y,x+15*Math.cos(a),y+15*Math.sin(a),colors.muted);} };
+ const hull=(x,y,ww)=>{c.fillStyle=colors.hull;c.beginPath();c.moveTo(X(x),Y(y));c.lineTo(X(x+ww),Y(y));c.lineTo(X(x+ww-25),Y(y+36));c.lineTo(X(x+25),Y(y+36));c.closePath();c.fill();};
+ const fin=(x,y)=>{const d=Math.max(-18,Math.min(18,s.rv*24));line(x-45,y+d,x+45,y-d,colors.green,6);ellipse(x,y,5,5,colors.ink);};
+ if(VIEW==='whole'){
+  const top=90-Math.tanh(s.zs)*24,bottom=320-Math.tanh(s.zu)*18;wave(115);hull(200,top,250);box(285,top-32,80,32);line(330,top-32,330,top-65);box(220,top-10,45,25);mark(1,432,top+18);mark(2,342,top-65);mark(3,232,top-10);
+  line(300,top+36,300,bottom,colors.power,3);line(313,top+36,326,(top+bottom)/2);line(326,(top+bottom)/2,313,bottom);mark(5,326,(top+bottom)/2);
+  box(240,bottom,195,18,colors.pod);box(246,bottom-28,76,25,colors.green);box(328,bottom-28,76,25,colors.green);mark(4,378,bottom-20);mark(6,431,bottom+10);
+  box(230,bottom+30,155,30,colors.pod);line(230,bottom+30,208,bottom+18);line(230,bottom+60,208,bottom+74);mark(7,202,bottom+25);mark(8,390,bottom+49);ellipse(300,bottom+44,53,8,colors.power);mark(12,288,bottom+43);fin(258,bottom+86);fin(386,bottom+86);mark(9,242,bottom+94);mark(10,384,bottom+94);prop(434,bottom+46);mark(11,455,bottom+46);
+  text(`${params.L} m deployed`,25,240);text(`Relative travel ${s.rel.toFixed(2)} m`,25,264);
+ }else if(VIEW==='power'){
+  const top=90-Math.tanh(s.zs)*22,bottom=350-Math.tanh(s.zu)*15;wave(118);hull(100,top,250);mark(1,115,top+20);
+  box(211,top-34,28,66);line(225,top+25,225,bottom,colors.power,3);mark(2,214,top+63);mark(3,253,top-18);
+  ellipse(290,top-10,24,24,colors.dark);const a=s.rel*4;line(290-20*Math.cos(a),top-10-20*Math.sin(a),290+20*Math.cos(a),top-10+20*Math.sin(a),colors.power);mark(4,290,top-39);
+  box(335,top-26,54,35,colors.pod);mark(5,364,top-43);line(315,top-10,335,top-10);box(420,100,85,48);mark(6,461,92);box(429,224,68,43,colors.green);mark(7,470,280);line(389,top-10,420,124,colors.power);line(461,148,461,224,colors.power);
+  c.beginPath();for(let i=0;i<=16;i++){let x=245+(i%2?10:-10),y=top+80+i*(bottom-top-90)/16;i?c.lineTo(X(x),Y(y)):c.moveTo(X(x),Y(y));}c.strokeStyle=colors.muted;c.stroke();mark(8,260,(top+bottom)/2);
+  box(130,bottom,190,25,colors.pod);mark(9,146,bottom+40);ellipse(365,bottom,24*Math.exp(-.1*params.L)+4,12*Math.exp(-.1*params.L)+3,colors.sea);mark(10,391,bottom+19);
+  text(`${params.L} m connection`,20,244);text(`PTO ${s.power.toFixed(0)} W`,400,180);text(`Δz ${s.rel.toFixed(2)} m`,20,267);
+ }else if(VIEW==='underwater'){
+  wave(25);let dy=-Math.tanh(s.zu)*18;box(130,165+dy,340,40,colors.pod);mark(3,470,181+dy);
+  box(150,110+dy,145,38,colors.green);box(315,110+dy,135,38,colors.green);mark(1,195,108+dy);mark(2,375,108+dy);line(300,30,300,160+dy,colors.power,3);mark(4,315,71+dy);
+  box(140,233+dy,310,55,colors.pod);line(140,233+dy,95,207+dy);line(140,288+dy,95,310+dy);mark(5,86,258+dy);mark(6,260,232+dy);box(398,246+dy,25,30,colors.green);mark(7,436,243+dy);ellipse(270,261+dy,105,15,colors.power);mark(8,270,280+dy);
+  fin(205,356+dy);fin(408,356+dy);mark(9,173,365+dy);mark(10,422,365+dy);line(205,329+dy,230,300+dy);mark(11,242,327+dy);prop(500,260+dy);mark(12,528,262+dy);box(90,166+dy,20,28);mark(13,84,157+dy);
+  text(`Pressure ${s.pressureBar.toFixed(2)} bar abs`,26,417);text(`Orbital flow ${s.orbDeep.toFixed(2)} m/s`,300,417);
+ }else{
+  let top=220-Math.tanh(s.zs)*20;wave(top+26);hull(65,top,510);mark(1,90,top+32);box(350,top-110,120,110);mark(2,425,top-94);line(410,top-110,410,top-170);ellipse(410,top-160,10,10,colors.power);mark(3,431,top-168);
+  box(170,top-40,26,92);line(183,top+52,183,top+126,colors.power,3);mark(4,160,top+76);
+  ellipse(227,top-5,28,28,colors.dark);let a=s.rel*4;line(227-22*Math.cos(a),top-5-22*Math.sin(a),227+22*Math.cos(a),top-5+22*Math.sin(a),colors.power);mark(5,226,top-45);
+  box(275,top-22,51,35,colors.pod);line(255,top-5,275,top-5);mark(6,300,top-37);box(361,top-50,44,29,colors.power);mark(7,372,top-12);box(412,top-50,43,29,colors.green);mark(8,445,top-12);
+  box(486,top-8,50,10);mark(9,515,top-25);line(337,top,349,top+125,colors.green);mark(10,354,top+120);line(111,top+14,160,top+14,colors.muted,4);mark(11,130,top-15);mark(12,495,top-74);
+  line(34,70,180,70,colors.sea);text(`Wind ${params.wind.toFixed(1)} m/s`,35,53);text(`Air load ${s.windForce.toFixed(0)} N`,34,99);text('Deck equipment shown in cutaway',32,430);
+ }
+ for(const [n,x,y]of coords){const px=Math.max(12,Math.min(w-12,X(x))),py=Math.max(12,Math.min(h-12,Y(y)));c.fillStyle=colors.dark;c.strokeStyle=colors.power;c.lineWidth=1;c.beginPath();c.arc(px,py,10,0,7);c.fill();c.stroke();c.fillStyle=colors.power;c.font='11px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText(n,px,py);c.textAlign='left';c.textBaseline='alphabetic';}
+}
+let chartDefs=[];
+function makeCharts(){const time=run.points.map(x=>x.t);const series=(key,label,color)=>({values:run.points.map(x=>x[key]),label,color});
+ const defs={whole:[['Battery energy','kWh',[{values:run.points.map(x=>x.battery/1000),label:'Main battery',color:colors.green}]],['Electrical balance','W',[series('power','Generation',colors.power),series('load','Demand',colors.sea)]],['Coupled heave','m',[series('zs','Surface',colors.power),series('zu','Submerged',colors.sea)]]],power:[['Relative displacement','m',[series('rel','PTO travel',colors.sea)]],['Dynamic connection load','kN',[{values:run.points.map(x=>x.connection/1000),label:'Spring + PTO',color:colors.power}]],['Power conversion','W',[series('mechanical','Captured mechanical',colors.sea),series('power','Electricity',colors.power),series('foil','Foil allocation',colors.green)]]],underwater:[['Lower body motion','m',[series('zu','Heave',colors.sea)]],['Underwater loads','N',[series('waterUnder','Lower drag',colors.sea),series('beam','Connection drag',colors.power)]],['Dock charging delivered','W',[series('charge','AUV charger',colors.green)]]],surface:[['Wave and hull motion','m',[series('eta','Water surface',colors.sea),series('zs','Hull heave',colors.power)]],['Surface forces','N',[series('windForce','Mean-wind drag',colors.green),series('gustForce','Gust envelope',colors.power),series('waterSurface','Hull water drag',colors.sea)]],['Electrical output','W',[series('power','Generator',colors.power)]]]};
+ chartDefs=defs[VIEW].map(([title,unit,lines])=>({title,unit,lines,x:time,xlabel:'Time (s)'}));
+ if(VIEW==='power'){const lengths=[3,5,8,12,16,20,25,30,40,50],sweep=lengths.map(L=>simulate({...params,L,seconds:60}));chartDefs.push({title:'Length comparison · 60 s screening',unit:'W',x:lengths,xlabel:'Deployed length (m)',lines:[{values:sweep.map(r=>r.avgPower),label:'Mean electric output',color:colors.power}],noGuide:true});}
+ $('charts').innerHTML=chartDefs.map((d,i)=>`<div class="panel"><h2>${d.title}</h2><canvas id="chart-${i}" class="chart" role="img" aria-label="${d.title}, ${d.unit}, versus ${d.xlabel}"></canvas></div>`).join('');
+}
+function drawCharts(){chartDefs.forEach((d,i)=>{const {c,w,h}=canvas(`chart-${i}`),left=57,right=16,top=40,bottom=35,pw=w-left-right,ph=h-top-bottom;const vals=d.lines.flatMap(s=>s.values);let lo=Math.min(...vals),hi=Math.max(...vals);if(hi-lo<1e-7){lo-=1;hi+=1;}const pad=(hi-lo)*.08;lo-=pad;hi+=pad;const X=x=>left+(x-d.x[0])/(d.x.at(-1)-d.x[0])*pw,Y=y=>top+(hi-y)/(hi-lo)*ph;
+ c.font='11px system-ui';c.textAlign='left';d.lines.forEach((s,j)=>{c.fillStyle=s.color;c.fillText(s.label,10+(j%2)*w/2,12+Math.floor(j/2)*14);});
+ c.strokeStyle=colors.line;c.strokeRect(left,top,pw,ph);for(let j=0;j<4;j++){let v=lo+(hi-lo)*j/3,y=Y(v);c.strokeStyle=colors.line;c.beginPath();c.moveTo(left,y);c.lineTo(w-right,y);c.stroke();c.fillStyle=colors.muted;c.textAlign='right';c.fillText(Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v.toFixed(1),left-5,y+4);}
+ for(let j=0;j<4;j++){let x=d.x[0]+(d.x.at(-1)-d.x[0])*j/3;c.fillStyle=colors.muted;c.textAlign='center';c.fillText(x.toFixed(0),X(x),h-20);}c.fillText(d.xlabel,left+pw/2,h-3);c.textAlign='left';c.fillText(d.unit,2,top-3);
+ c.save();c.beginPath();c.rect(left,top,pw,ph);c.clip();for(const s of d.lines){c.beginPath();s.values.forEach((v,j)=>{j?c.lineTo(X(d.x[j]),Y(v)):c.moveTo(X(d.x[j]),Y(v));});c.strokeStyle=s.color;c.lineWidth=1.5;c.stroke();}if(!d.noGuide){c.strokeStyle=colors.muted;c.beginPath();c.moveTo(X(run.points[frameIndex].t),top);c.lineTo(X(run.points[frameIndex].t),top+ph);c.stroke();}c.restore();});}
+function render(){const s=run.points[frameIndex];$('clock').textContent=s.t.toFixed(1)+' s';$('time').value=s.t;drawDiagram(s);drawCharts();}
+applyPreset();$('play').textContent=playing?'Pause':'Play';
+new ResizeObserver(()=>render()).observe($('diagram'));
+function tick(now){if(dirty&&now-last>180)recompute();if(playing&&now-last>100){frameIndex=Math.min(frameIndex+1,run.points.length-1);if(frameIndex===run.points.length-1){playing=false;$('play').textContent='Replay';}render();last=now;}requestAnimationFrame(tick);}requestAnimationFrame(tick);
+
+</script></body></html>

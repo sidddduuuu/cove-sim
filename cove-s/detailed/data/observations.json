@@ -1,0 +1,91 @@
+{
+  "station": "46005",
+  "year": 2024,
+  "url": "https://www.ndbc.noaa.gov/data/historical/stdmet/46005h2024.txt.gz",
+  "sha256": "42deabc8d00f5ef8af9340e53007e8b7490f3bb3a955d7a2b9796bd9d2e8b5bc",
+  "validRows": 15523,
+  "presets": [
+    {
+      "time": "2024-09-04T17:10:00Z",
+      "H": 0.59,
+      "T": 7.69,
+      "wind": 2.5,
+      "gust": 3.6,
+      "label": "Observed 0th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-06-26T03:40:00Z",
+      "H": 1.07,
+      "T": 14.81,
+      "wind": 4.6,
+      "gust": 6.6,
+      "label": "Observed 5th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-09-20T03:10:00Z",
+      "H": 1.53,
+      "T": 5.56,
+      "wind": 6.8,
+      "gust": 8.6,
+      "label": "Observed 25th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-09-11T04:10:00Z",
+      "H": 2.14,
+      "T": 6.25,
+      "wind": 10.6,
+      "gust": 13.6,
+      "label": "Observed 50th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-02-04T22:40:00Z",
+      "H": 3.16,
+      "T": 7.14,
+      "wind": 12.6,
+      "gust": 16.0,
+      "label": "Observed 75th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-02-18T02:40:00Z",
+      "H": 4.41,
+      "T": 14.81,
+      "wind": 4.2,
+      "gust": 6.0,
+      "label": "Observed 90th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-11-03T19:40:00Z",
+      "H": 5.86,
+      "T": 14.81,
+      "wind": 7.7,
+      "gust": 9.7,
+      "label": "Observed 97th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-02-03T01:10:00Z",
+      "H": 7.29,
+      "T": 13.79,
+      "wind": 13.0,
+      "gust": 17.8,
+      "label": "Observed 99.5th percentile by wave height",
+      "kind": "observed"
+    },
+    {
+      "time": "2024-01-09T14:40:00Z",
+      "H": 9.31,
+      "T": 13.79,
+      "wind": 15.6,
+      "gust": 22.7,
+      "label": "Observed 100th percentile by wave height",
+      "kind": "observed"
+    }
+  ],
+  "notes": "Simultaneous valid WVHT, DPD and WSPD only. Percentiles describe this filtered station-year, not global oceans. No current measurements in this file."
+}

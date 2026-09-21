@@ -1,0 +1,6 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+const dir=fileURLToPath(new URL('.',import.meta.url));
+const views=[['whole','Whole system','Surface, submerged dock, energy storage and propulsion in one coupled run.'],['power','Wave power & connection length','Relative heave, mechanical conversion and the cost of a longer connection.'],['underwater','Underwater service module','Reaction plate, battery pressure pods, AUV dock, fins and thruster.'],['surface','Above-water module','Hull motion, wind loading, generator and deck equipment.']];
+const model=readFileSync(dir+'physics.mjs','utf8').replace(/^export /gm,''),ui=readFileSync(dir+'ui.js','utf8'),data=readFileSync(dir+'data/observations.json','utf8'),template=readFileSync(dir+'dashboard.template.html','utf8');
+for(const [id,title,sub]of views){let html=template.replaceAll('__TITLE__',title).replaceAll('__SUBTITLE__',sub).replaceAll('__VIEW__',id).replace('__NAV__',views.map(([k,t])=>`<a class="${id===k?'active':''}" href="${k}.html">${t}</a>`).join('')).replace('/*__MODEL__*/',()=>model).replace('/*__DATA__*/',()=>data).replace('/*__UI__*/',()=>ui);writeFileSync(dir+id+'.html',html);console.log(id+'.html');}

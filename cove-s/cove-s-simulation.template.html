@@ -1,0 +1,106 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cove S mobile AUV charging station</title><style>
+:root{color-scheme:light dark;--background:light-dark(#fff,#15191c);--foreground:light-dark(#1d2930,#e3edf2);--card:light-dark(#f5f8fa,#20272c);--border:light-dark(#bcc8ce,#4c5d66);--muted-foreground:light-dark(#566872,#a9bac3);--popover:var(--background);--popover-foreground:var(--foreground);--destructive:light-dark(#a62920,#ff9e96);--viz-series-1:light-dark(#0077a8,#67cef7);--viz-series-2:light-dark(#ae5a0a,#ffb56e);--viz-series-3:light-dark(#26844e,#7cdaa2);--viz-series-4:light-dark(#7651a8,#c6a7f1);--water:light-dark(#dceff7,#203742);--wave:light-dark(#4d9fc2,#69c9ef)}
+body{max-width:1040px;margin:24px auto;padding:0 20px;background:var(--background);color:var(--foreground);font:16px/1.5 system-ui,sans-serif}h1{font-size:1.5rem;font-weight:500;margin:0 0 4px}h2{font-size:1.05rem;font-weight:500;margin:18px 0 8px}strong{font-weight:500}a{color:var(--viz-series-1)}code{font-size:.92em}.text-small{font-size:.875rem;color:var(--muted-foreground)}.btn{font:inherit;padding:6px 14px;border:1px solid var(--border);border-radius:5px;background:var(--background);color:var(--foreground);cursor:pointer}.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px}.tabular{font-variant-numeric:tabular-nums}footer{margin:24px 0;color:var(--muted-foreground)}
+</style></head><body><main id="cove-s">
+<style>
+#cove-s *{box-sizing:border-box}#cove-s .controls{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:12px 18px;margin:16px 0}#cove-s label{display:block;min-width:0}#cove-s input[type=range],#cove-s select{width:100%}#cove-s select{min-height:36px;color:var(--foreground);background:var(--background);border:1px solid var(--border);padding:5px}#cove-s output{float:right;font-variant-numeric:tabular-nums}#cove-s .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}#cove-s .metric b{display:block;font-size:1.25rem;font-weight:500;font-variant-numeric:tabular-nums}#cove-s .scene{display:block;width:100%;height:330px;margin-top:4px}#cove-s svg text{fill:var(--foreground);font-size:12px}#cove-s .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}#cove-s .phase{flex:1;min-width:220px}#cove-s .phase input{width:100%}#cove-s .readout{min-height:2em;margin:6px 0;font-variant-numeric:tabular-nums}#cove-s .verdict{border-left:4px solid var(--viz-series-3);padding:9px 12px;margin:10px 0;background:var(--card)}#cove-s .verdict.warn{border-left-color:var(--viz-series-2)}#cove-s .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}#cove-s .chart-wrap{min-width:0}#cove-s .chart{width:100%;height:230px;display:block}#cove-s .wide{grid-column:1/-1}#cove-s .tip{position:absolute;pointer-events:none;padding:7px 9px;background:var(--popover);color:var(--popover-foreground);border:1px solid var(--border);z-index:5;font-size:.8rem}#cove-s details{margin-top:8px}#cove-s summary{cursor:pointer}#cove-s .error{color:var(--destructive)}
+@media(max-width:760px){#cove-s .controls{grid-template-columns:repeat(2,minmax(0,1fr))}#cove-s .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}#cove-s .charts{grid-template-columns:1fr}#cove-s .wide{grid-column:auto}}
+@media(max-width:420px){#cove-s .controls{grid-template-columns:1fr}#cove-s .scene{height:290px}}
+</style>
+<h1>Cove S — mobile wave-powered AUV service station</h1>
+<div class="text-small">Concept screening model · wave-only electricity and propulsion · 1.5–5 kWh AUV class · protected energy reserve</div>
+<div class="controls" id="controls"></div>
+<details><summary>Power system assumptions</summary><div class="controls" id="advanced"></div></details>
+<div id="validation" role="alert" class="error"></div>
+<div class="metrics" id="metrics" aria-live="polite"></div>
+<div class="verdict" id="verdict"></div>
+<svg class="scene" id="scene" role="img" aria-label="Cove S surface platform connected to a submerged wave propulsion body and AUV charging garage"></svg>
+<div class="row"><button class="btn" id="play" type="button">Play mission</button><label class="phase">Mission time <output id="time-value">Day 0.0</output><input id="time" type="range" min="0" max="1000" value="0"></label></div>
+<div class="readout text-small" id="instant"></div>
+<div class="charts">
+  <div class="chart-wrap wide"><h2>Stored energy and AUV service</h2><svg class="chart" id="battery-chart" role="img" aria-label="Platform battery state of charge over the mission"></svg></div>
+  <div class="chart-wrap"><h2>Generation and loads</h2><svg class="chart" id="power-chart" role="img" aria-label="Wave generation and electrical load over the mission"></svg></div>
+  <div class="chart-wrap"><h2>Distance traveled</h2><svg class="chart" id="distance-chart" role="img" aria-label="Cumulative distance traveled over the mission"></svg></div>
+</div>
+<div class="tip" role="tooltip" hidden></div>
+</main>
+<footer class="text-small">Screening source: <code>cove-s-model.mjs</code>. The sea histories are representative scenarios, not measured sites. Hydrodynamics, tether loads, docking control, fatigue, and biofouling require physical validation.</footer>
+<script>
+// https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock
+/*__D3__*/
+</script><script>
+/*__MODEL__*/
+(() => {
+  const root=document.getElementById('cove-s'),$=s=>root.querySelector(s);
+  const controls=[
+    {key:'scenario',label:'Sea history',type:'select',options:[['variable','Variable offshore'],['design','1 m / 6 s design sea'],['calm','Three-day calm spell'],['storm','Storm and survival']]},
+    {key:'days',label:'Mission length',unit:'days',min:3,max:30,step:1},
+    {key:'auvWh',label:'AUV battery',unit:'kWh',min:500,max:5000,step:250,scale:1000},
+    {key:'visitsPerDay',label:'AUV arrivals',unit:'/day',min:0,max:3,step:1},
+    {key:'batteryWh',label:'Station battery',unit:'kWh',min:10000,max:100000,step:5000,scale:1000},
+    {key:'ratedPowerW',label:'WEC rating',unit:'kW',min:250,max:5000,step:250,scale:1000},
+    {key:'captureWidth',label:'Effective capture width',unit:'m',min:.1,max:1,step:.05},
+    {key:'thrusterTargetKn',label:'Minimum transit speed',unit:'kn',min:0,max:2,step:.1}
+  ];
+  const advanced=[
+    {key:'initialSoc',label:'Initial battery',unit:'%',min:.2,max:1,step:.05,scale:.01},
+    {key:'reserveSoc',label:'Protected reserve',unit:'%',min:.1,max:.5,step:.05,scale:.01},
+    {key:'hotelW',label:'Hotel load',unit:'W',min:20,max:300,step:10},
+    {key:'dockPowerW',label:'Dock output',unit:'kW',min:250,max:3000,step:250,scale:1000},
+    {key:'dockEfficiency',label:'Dock efficiency',unit:'%',min:.5,max:.95,step:.05,scale:.01},
+    {key:'propulsionAllocation',label:'Wave share to propulsion',unit:'%',min:0,max:.5,step:.05,scale:.01},
+    {key:'maxWaveSpeedKn',label:'Maximum wave speed',unit:'kn',min:.5,max:2.5,step:.1},
+    {key:'tunedPeriod',label:'Tuned period',unit:'s',min:3,max:10,step:.5}
+  ];
+  const values={...coveSDefaults};let model,current=0,playing=false,last=0;
+  function displayed(c,v){return c.scale?v/c.scale:v;}
+  function actual(c,v){return c.scale?v*c.scale:v;}
+  function renderControls(list,target){
+    const box=$(target);box.innerHTML='';
+    for(const c of list){const label=document.createElement('label');label.className='text-small';
+      if(c.type==='select'){
+        label.textContent=c.label;const select=document.createElement('select');select.dataset.key=c.key;
+        for(const [value,text] of c.options){const o=document.createElement('option');o.value=value;o.textContent=text;select.append(o);}select.value=values[c.key];label.append(select);
+      }else{
+        const out=document.createElement('output');out.textContent=`${displayed(c,values[c.key]).toFixed(c.step<1?1:0)} ${c.unit}`;label.append(document.createTextNode(c.label),out);
+        const input=document.createElement('input');input.type='range';input.min=c.min;input.max=c.max;input.step=c.step;input.value=displayed(c,values[c.key]);input.dataset.key=c.key;label.append(input);
+      }box.append(label);
+    }
+  }
+  renderControls(controls,'#controls');renderControls(advanced,'#advanced');
+  root.addEventListener('input',e=>{const key=e.target.dataset.key;if(!key)return;const c=[...controls,...advanced].find(x=>x.key===key);values[key]=c.type==='select'?e.target.value:actual(c,+e.target.value);const out=e.target.parentElement.querySelector('output');if(out)out.textContent=`${displayed(c,values[key]).toFixed(c.step<1?1:0)} ${c.unit}`;recalculate();});
+  function fmt(v,d=1){return Number(v).toLocaleString(undefined,{maximumFractionDigits:d});}
+  function recalculate(){
+    try{model=simulateCoveS(values);$('#validation').textContent='';current=Math.min(current,model.p.days*24);$('#time').value=current/(model.p.days*24)*1000;draw();}
+    catch(err){$('#validation').textContent=err.message;}
+  }
+  function draw(){if(!model)return;const q=coveSAt(model,current),p=model.p;
+    $('#metrics').innerHTML=[['Distance',`${fmt(model.distanceKm,0)} km`],['AUVs charged',`${model.completed} / ${p.days*p.visitsPerDay}`],['Lowest battery',`${fmt(model.minBatteryWh/p.batteryWh*100,0)}%`],['Wave energy',`${fmt(model.generatedWh/1000,1)} kWh`]].map(([a,b])=>`<div class="card metric"><span class="text-small">${a}</span><b>${b}</b></div>`).join('');
+    const ok=model.deferred===0&&model.minBatteryWh>model.reserveWh+1;$('#verdict').className='verdict'+(ok?'':' warn');
+    $('#verdict').innerHTML=ok?`<strong>Mission closes.</strong> All ${model.completed} requested charges finish while the platform travels ${fmt(model.distanceKm,0)} km and preserves its ${(p.reserveSoc*100).toFixed(0)}% reserve.`:`<strong>Mission is constrained.</strong> ${model.deferred} charging request${model.deferred===1?' remains':'s remain'} unfinished; adjust generation, storage, demand, or transit assistance.`;
+    $('#time-value').textContent=`Day ${(current/24).toFixed(1)}`;
+    $('#instant').textContent=`H ${q.height.toFixed(2)} m · T ${q.period.toFixed(1)} s · ${q.generationW.toFixed(0)} W generated · battery ${(q.soc*100).toFixed(0)}% · ${q.speedKn.toFixed(2)} kn · queue ${Math.round(q.queue)}${q.charging?' · charging':''}`;
+    drawScene(q);drawBattery();drawPower();drawDistance();
+  }
+  function drawScene(q){const svg=d3.select('#scene'),node=svg.node(),w=node.clientWidth||900,h=node.clientHeight||330;svg.attr('viewBox',`0 0 ${w} ${h}`);svg.selectAll('*').remove();
+    const waterY=105,amp=Math.min(18,4+q.height*7),phase=current*.8;const wave=d3.range(0,w+8,8).map(x=>[x,waterY+amp*Math.sin(x/48+phase)]);
+    svg.append('path').attr('d',d3.line()(wave)+`L${w},${h}L0,${h}Z`).attr('fill','var(--water)');svg.append('path').attr('d',d3.line()(wave)).attr('fill','none').attr('stroke','var(--wave)').attr('stroke-width',2);
+    const cx=w*.43;svg.append('rect').attr('x',cx-95).attr('y',waterY-28).attr('width',190).attr('height',45).attr('rx',20).attr('fill','var(--card)').attr('stroke','var(--border)');
+    svg.append('rect').attr('x',cx-125).attr('y',waterY-18).attr('width',46).attr('height',24).attr('rx',10).attr('fill','var(--viz-series-1)');svg.append('rect').attr('x',cx+79).attr('y',waterY-18).attr('width',46).attr('height',24).attr('rx',10).attr('fill','var(--viz-series-1)');
+    svg.append('text').attr('x',cx).attr('y',waterY-38).attr('text-anchor','middle').text('surface power platform');
+    const dockY=h-72;svg.append('line').attr('x1',cx).attr('y1',waterY+16).attr('x2',cx).attr('y2',dockY-15).attr('stroke','var(--border)').attr('stroke-width',3);
+    svg.append('ellipse').attr('cx',cx).attr('cy',dockY).attr('rx',105).attr('ry',20).attr('fill','var(--card)').attr('stroke','var(--border)');svg.append('path').attr('d',`M${cx-85},${dockY}q28,28 56,0m58,0q28,28 56,0`).attr('fill','none').attr('stroke','var(--viz-series-3)').attr('stroke-width',5);
+    svg.append('text').attr('x',cx).attr('y',dockY+43).attr('text-anchor','middle').text('reaction plate · propulsion foils · AUV garage');
+    const ax=w*.78,ay=dockY;svg.append('path').attr('d',`M${ax-48},${ay}L${ax+32},${ay}L${ax+50},${ay-9}L${ax+50},${ay+9}L${ax+32},${ay}L${ax-48},${ay+11}Z`).attr('fill','var(--viz-series-2)');svg.append('circle').attr('cx',ax-18).attr('cy',ay+2).attr('r',4).attr('fill','var(--background)');svg.append('text').attr('x',ax).attr('y',ay-20).attr('text-anchor','middle').text(q.charging?'AUV latched and charging':'AUV approach corridor');
+    svg.append('line').attr('x1',cx+110).attr('y1',dockY).attr('x2',ax-55).attr('y2',ay).attr('stroke','var(--viz-series-2)').attr('stroke-dasharray','5 4');
+    const energyY=48;svg.append('text').attr('x',22).attr('y',energyY).text(`${q.generationW.toFixed(0)} W → battery ${(q.soc*100).toFixed(0)}%`);svg.append('text').attr('x',w-22).attr('y',energyY).attr('text-anchor','end').text(`${q.speedKn.toFixed(2)} kn → ${q.distanceKm.toFixed(0)} km`);
+  }
+  function chartBase(selector,yLabel){const svg=d3.select(selector),node=svg.node(),w=node.clientWidth||450,h=node.clientHeight||230,m={t:8,r:18,b:32,l:58};svg.attr('viewBox',`0 0 ${w} ${h}`);svg.selectAll('*').remove();const x=d3.scaleLinear().domain([0,model.p.days]).range([m.l,w-m.r]);svg.append('g').attr('transform',`translate(0,${h-m.b})`).call(d3.axisBottom(x).ticks(Math.min(7,model.p.days))).call(g=>g.append('text').attr('x',w-m.r).attr('y',28).attr('text-anchor','end').text('day'));return {svg,w,h,m,x};}
+  function drawBattery(){const {svg,w,h,m,x}=chartBase('#battery-chart');const y=d3.scaleLinear().domain([0,100]).range([h-m.b,m.t]);svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d=>d+'%'));svg.append('line').attr('x1',m.l).attr('x2',w-m.r).attr('y1',y(model.p.reserveSoc*100)).attr('y2',y(model.p.reserveSoc*100)).attr('stroke','var(--destructive)').attr('stroke-dasharray','5 4');svg.append('path').datum(model.points).attr('d',d3.line().x(d=>x(d.day)).y(d=>y(d.soc*100))).attr('fill','none').attr('stroke','var(--viz-series-1)').attr('stroke-width',2);svg.selectAll('circle.event').data(model.events.filter(e=>e.type==='complete')).join('circle').attr('cx',d=>x(d.h/24)).attr('cy',d=>y(coveSAt(model,d.h).soc*100)).attr('r',4).attr('fill','var(--viz-series-3)');svg.append('line').attr('x1',x(current/24)).attr('x2',x(current/24)).attr('y1',m.t).attr('y2',h-m.b).attr('stroke','var(--foreground)').attr('opacity',.45);}
+  function drawPower(){const {svg,w,h,m,x}=chartBase('#power-chart');const max=d3.max(model.points,d=>Math.max(d.generationW,d.hotelW+d.thrusterW+d.chargeW))||1,y=d3.scaleLinear().domain([0,max*1.08]).range([h-m.b,m.t]);svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5));svg.append('path').datum(model.points).attr('d',d3.line().x(d=>x(d.day)).y(d=>y(d.generationW))).attr('fill','none').attr('stroke','var(--viz-series-1)').attr('stroke-width',1.8);svg.append('path').datum(model.points).attr('d',d3.line().x(d=>x(d.day)).y(d=>y(d.hotelW+d.thrusterW+d.chargeW))).attr('fill','none').attr('stroke','var(--viz-series-2)').attr('stroke-width',1.6);svg.append('text').attr('x',m.l+6).attr('y',m.t+13).text('generation');svg.append('text').attr('x',m.l+78).attr('y',m.t+13).attr('fill','var(--viz-series-2)').text('load');}
+  function drawDistance(){const {svg,h,m,x}=chartBase('#distance-chart');const max=Math.max(1,model.distanceKm),y=d3.scaleLinear().domain([0,max]).range([h-m.b,m.t]);svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d=>d+' km'));svg.append('path').datum(model.points).attr('d',d3.line().x(d=>x(d.day)).y(d=>y(d.distanceKm))).attr('fill','none').attr('stroke','var(--viz-series-3)').attr('stroke-width',2);}
+  $('#time').addEventListener('input',e=>{current=+e.target.value/1000*model.p.days*24;draw();});$('#play').addEventListener('click',()=>{playing=!playing;$('#play').textContent=playing?'Pause':'Play mission';last=performance.now();if(playing)requestAnimationFrame(tick);});
+  function tick(now){if(!playing)return;const dt=(now-last)/1000;last=now;current+=dt*model.p.days*24/18;if(current>=model.p.days*24){current=0;}$('#time').value=current/(model.p.days*24)*1000;draw();requestAnimationFrame(tick);}
+  new ResizeObserver(()=>draw()).observe(root);recalculate();
+})();
+</script></body></html>
