@@ -1,4 +1,4 @@
-// Reduced-order screening model; SI units internally. See MODEL.md.
+// Reduced-order screening model; SI units internally. See ../ARCHITECTURE_AND_SCALING.md.
 export const defaults = Object.freeze({length:150, width:20, substrate:0.2,
   piezo:0.2, diameter:15, speed:1, period:6, resistance:5,
   addedMass:5, damping:0.08, strainLimit:500, battery:1000, efficiency:0.6});

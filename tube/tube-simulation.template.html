@@ -35,7 +35,7 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
   <div class="controls" id="primary-controls"></div>
   <details>
     <summary>Suspension, winding and electrical assumptions</summary>
-    <div class="text-small">A sealed pipe floats and follows the wave. Tilt trades one limit for another: upright, the suspension must hold the magnet up and a spring soft enough to resonate sags g·cos(tilt)/ω² (8.95 m at 6 s, whatever the magnet weighs); flat, the sag vanishes but the magnet rests on the bore and only moves if the friction coefficient stays under a·ω²/g — a ratio no bigger magnet can improve. Inside, an axially magnetised magnet slides in the bore; coils wound outside see its flux move and the induced current opposes the motion. Repelling end magnets are scaled to hold the magnet's own weight at the levitation gap: with no added spring they <em>are</em> the suspension, otherwise they are end bumpers and the magnet is preloaded to mid-travel. Coil inductance is neglected (L/R is milliseconds against a multi-second wave) and flagged when that fails. Load resistance 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
+    <div class="text-small">A sealed pipe floats and follows the wave. Tilt trades one limit for another: upright, the suspension must hold the magnet up and a spring soft enough to resonate sags g·cos(tilt)/ω² (8.95 m at 6 s, whatever the magnet weighs); flat, the sag vanishes but the magnet rests on the bore and only moves if the friction coefficient stays under a·ω²/g — a ratio no bigger magnet can improve. Inside, an axially magnetised magnet slides in the bore; coils wound outside see its flux move and the induced current opposes the motion. Repelling end magnets are scaled to hold the magnet's own weight at the levitation gap: with no added spring they <em>are</em> the suspension, otherwise they are end bumpers and the magnet is preloaded to mid-travel. Coil inductance is neglected (L/R is milliseconds against a multi-second wave) and flagged when that fails. Load resistance 0 = search for the power-maximising value. See ../ARCHITECTURE_AND_SCALING.md for what is not modeled.</div>
     <div class="controls" id="advanced-controls"></div>
   </details>
   <div id="validation" role="alert" class="error"></div>
@@ -56,7 +56,7 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
   <div class="text-small" id="notes" aria-live="polite"></div>
   <div class="tip" role="tooltip" hidden></div>
 </div>
-<footer class="text-small">Source: <code>tube-model.mjs</code> (checked by <code>node check-tube.mjs</code>). Rebuild with <code>node build.mjs</code>; sweeps in <code>RESULTS.md</code> via <code>node run.mjs</code>.</footer>
+<footer class="text-small">Source: <code>tube-model.mjs</code> (checked by <code>node check-tube.mjs</code>). Rebuild with <code>node build.mjs</code>; sweeps in <code>../RESULTS.txt</code> via <code>node run.mjs</code>.</footer>
 
 <script>
 // https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock

@@ -35,7 +35,7 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
   <div class="controls" id="primary-controls"></div>
   <details>
     <summary>Hull, pendulum, drive train, storage &amp; dock assumptions</summary>
-    <div class="text-small">A horizontal cylinder floats like a log and follows the wave (pitch from the wave slope, surge/heave from the orbit). Inside, a physical pendulum on a transverse shaft lags the hull; the generator resists the relative rotation. A torsion spring (negative when needed) tunes the pendulum to the wave period with a long arm so it keeps a full stroke; end-stops bound the swing. Generator damping 0 = search for the power-maximising value. See MODEL.md for what is not modeled.</div>
+    <div class="text-small">A horizontal cylinder floats like a log and follows the wave (pitch from the wave slope, surge/heave from the orbit). Inside, a physical pendulum on a transverse shaft lags the hull; the generator resists the relative rotation. A torsion spring (negative when needed) tunes the pendulum to the wave period with a long arm so it keeps a full stroke; end-stops bound the swing. Generator damping 0 = search for the power-maximising value. See ../ARCHITECTURE_AND_SCALING.md for what is not modeled.</div>
     <div class="controls" id="advanced-controls"></div>
   </details>
   <div id="validation" role="alert" class="error"></div>
@@ -56,7 +56,7 @@ h2 {font-size:1.4rem;font-weight:500;margin:0 0 6px} strong {font-weight:500} .t
   <div class="text-small" id="charging" aria-live="polite"></div>
   <div class="tip" role="tooltip" hidden></div>
 </div>
-<footer class="text-small">Source: <code>node-model.mjs</code> (checked by <code>node check-node.mjs</code>). Rebuild with <code>node build.mjs</code>; sweeps in <code>RESULTS.md</code> via <code>node run.mjs</code>.</footer>
+<footer class="text-small">Source: <code>node-model.mjs</code> (checked by <code>node check-node.mjs</code>). Rebuild with <code>node build.mjs</code>; sweeps in <code>../RESULTS.txt</code> via <code>node run.mjs</code>.</footer>
 
 <script>
 // https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock
